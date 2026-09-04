@@ -1,0 +1,66 @@
+# The Wandering City / Unity 游戏
+
+按 `docs/产品设计文档-MVP.md` 与 `docs/技术方案-MVP.md` 实现的 Windows 单机第三人称冒险原型。`demo/` 仍是独立网页参考，不是正式游戏入口。
+
+## 启动
+
+- 已构建版本：运行 `game/Builds/Windows/The Wandering City.exe`。分享时复制整个 Windows 文件夹，不能只复制 exe。
+- 编辑器：Unity Hub 添加本目录，使用 **6000.6.0f1**，打开 `Assets/_Game/Scenes/Boot.unity` 后按 Play。
+- 如果需要重新生成启动场景和默认配置：菜单 `Wandering City > Prepare playable scenes`。该命令会重建 Boot 和 World 两个入口场景；自定义地图应编辑 `WorldBuilder.cs` 或在独立场景中创作。
+- 构建：菜单 `Wandering City > Build Windows`，或 `./Tools/Verify.ps1 -Build`。
+
+Windows 键鼠和风格化几何占位资产采用技术方案的实施基线。锁定编辑器版本来自本机已安装正式版；包依赖提交于 `Packages/manifest.json` 和 `packages-lock.json`。
+
+## 操作与流程
+
+| 操作 | 按键 |
+| --- | --- |
+| 相对镜头移动 / 奔跑 | WASD / 左 Shift |
+| 转动镜头 / 调整距离 | 鼠标 / 滚轮 |
+| 跳跃 | Space |
+| 普通攻击 | 鼠标左键 |
+| 闪避 | 鼠标右键或左 Ctrl |
+| 采集、宝箱、工作台 | E |
+| 背包 / 地图 / 暂停 | Tab 或 I / M / Esc |
+| 快捷选择 / 使用 | 1～4 / Q |
+| 建造模式 | B；1 地板、2 墙、3 屋顶；R 旋转；左键放置；X 拆除 |
+| 手动保存 | F5，或暂停菜单 |
+
+出生点北侧散落木材与石材，右前方桌子是工作台。制作药剂和建筑模块后，在西侧网格建造。地板需要空地，墙依赖同格地板，屋顶需要同格地板与至少两面墙。拆除先屋顶、再墙、最后地板，完整回收模块，失败不扣资源。
+
+树林在西北，矿区在东北，营地在更北方。地图标出路线，三个隐藏奖励箱鼓励偏离主路。营地有五名守卫，全部击败后可领取星核，用星核 ×1 和矿石 ×5 将武器升级一次（伤害 26→42）。提前探索不会阻断目标链。完成小屋与升级后仍可继续探索。
+
+敌人橙色圆盘表示蓄力攻击。闪避前 0.28 秒免伤，持续 0.42 秒，冷却 0.9 秒。角色死亡后回据点，保留背包、已击败敌人及奖励进度。
+
+## 存档
+
+`%USERPROFILE%/AppData/LocalLow/WanderingCity/The Wandering City/journey.json`。关键操作后自动保存，探索中每 30 秒保存，也可手动保存。
+
+主档通过临时文件原子替换，保留 `.bak`。主档损坏时尝试备份；未知版本禁止自动覆盖。开始新旅程会把旧主档、备份和临时文件重命名为 `.archived-日期`，保留原内容。无损档则从据点开始。自动测试和 Windows 冒烟使用隔离目录，不碰玩家存档。
+
+## 实现结构
+
+- `Scripts/Core`：独立资源规则、配置与版本化存档；所有资源修改先校验后提交。
+- `Scripts/Gameplay`：CharacterController、Cinemachine 镜头、NavMesh 敌人、交互和固定地图生成。
+- `Scripts/UI`：uGUI + TextMeshPro 中文 HUD、背包、工作台、暂停与地图。
+- `Resources/Balance.asset`：战斗数值配置；`Traveler.controller`：占位状态动画。
+- `Tests/EditMode`：资源守恒、幂等、非法状态、建筑依赖、存档损坏和完整流程。
+- `Tests/PlayMode`：实际场景的攻击遮挡、碰撞、交互、重生、建筑与奖励恢复。
+
+地图由固定坐标和固定种子装饰生成，运行时只在启动构建一次静态 NavMesh；建造区与敌人区域分离。不包含地形挖掘、联网、云存档或动态天气。美术为代码生成几何占位，音效为原创合成提示音，后续可替换模型和动画。
+
+## 验证
+
+`Tools/Verify.ps1` 依次运行 Unity Edit Mode、Play Mode；加 `-Build` 构建 Windows。日志和 XML 输出至仓库根 `artifacts/`。
+
+开发构建可使用 `-qaOutput "绝对输出目录"` 运行隔离的自动冒烟：截图、通过交互接口采集、制作建造、领取营地奖励、升级和存档往返。冒烟中的传送和直接击败敌人仅用于验证流程及渲染，不代表真实玩家完成了一次冒险，也不替代战斗测试或人工试玩。它会生成截图及短时性能采样 JSON，然后退出。
+
+验收证据与尚待人工确认的项目见 `../docs/Unity实现与验证记录.md`。
+
+## 素材来源
+
+- Noto Sans SC：Google Fonts，SIL Open Font License 1.1，原许可证在 `Assets/_Game/Resources/Fonts/OFL.txt`；源文件：https://github.com/google/fonts/tree/main/ofl/notosanssc。
+- TextMeshPro Essential Resources、URP 设置：本机 Unity 官方包/模板随附内容，保留原 GUID 与许可文件。
+- 自有字体等大型二进制文件采用 Git LFS；`Library`、`Temp`、本机构建与报告不纳入版本管理。
+
+这是一版可玩占位原型。20～30 分钟体验、镜头舒适度、正式角色美术及参考硬件上的整段 60 FPS 验收仍需后续真人试玩与性能分析，不能用自动化规则测试替代。

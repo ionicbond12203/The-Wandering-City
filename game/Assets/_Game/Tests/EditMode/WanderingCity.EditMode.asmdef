@@ -1,0 +1,6 @@
+{
+  "name": "WanderingCity.EditMode",
+  "references": ["WanderingCity"],
+  "includePlatforms": ["Editor"],
+  "optionalUnityReferences": ["TestAssemblies"]
+}

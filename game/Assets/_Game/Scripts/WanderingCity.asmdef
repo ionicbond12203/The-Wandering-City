@@ -1,0 +1,5 @@
+{
+  "name": "WanderingCity",
+  "rootNamespace": "WanderingCity",
+  "references": ["Unity.InputSystem", "Unity.AI.Navigation", "Unity.Cinemachine", "Unity.TextMeshPro", "Unity.ugui", "Unity.RenderPipelines.Universal.Runtime"]
+}
