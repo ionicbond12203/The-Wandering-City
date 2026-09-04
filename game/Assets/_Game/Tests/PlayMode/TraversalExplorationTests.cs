@@ -25,13 +25,14 @@ namespace WanderingCity.Tests
         }
         void Position(Vector3 p, float yaw = 0)
         {
+            p.y += WorldBuilder.GroundY(p.x,p.z);
             game.State.x = p.x; game.State.y = p.y; game.State.z = p.z; game.State.yaw = yaw; game.Player.RestorePosition(); Physics.SyncTransforms();
         }
         void Step(Vector3 direction = default, Vector2 input = default, bool sprint = false, bool jump = false)
             => T.Simulate(.02f, direction, input, sprint, false, jump, false, false, false);
         GameObject Wall(float height = 5, bool climbable = true)
         {
-            var wall = GameObject.CreatePrimitive(PrimitiveType.Cube); wall.transform.position = new Vector3(0, height / 2, 22); wall.transform.localScale = new Vector3(10, height, 1);
+            var wall = GameObject.CreatePrimitive(PrimitiveType.Cube); wall.transform.position = WorldBuilder.GroundPoint(0,22,height/2); wall.transform.localScale = new Vector3(10, height, 1);
             if (climbable) wall.AddComponent<ClimbSurface>(); Physics.SyncTransforms(); return wall;
         }
         [UnityTest] public IEnumerator ClimbUsesOptInSurfaceAndExhaustionDetaches()
@@ -51,16 +52,16 @@ namespace WanderingCity.Tests
         }
         [UnityTest] public IEnumerator BlockedLedgeDoesNotTunnelThroughCeiling()
         {
-            Wall(3); var ceiling = GameObject.CreatePrimitive(PrimitiveType.Cube); ceiling.transform.position = new Vector3(0, 4, 22); ceiling.transform.localScale = new Vector3(5, .3f, 4); Physics.SyncTransforms();
+            Wall(3); var ceiling = GameObject.CreatePrimitive(PrimitiveType.Cube); ceiling.transform.position = WorldBuilder.GroundPoint(0,22,4); ceiling.transform.localScale = new Vector3(5, .3f, 4); Physics.SyncTransforms();
             Position(new Vector3(0, .1f, 20.9f)); Assert.IsTrue(T.TryClimb());
             for (int i = 0; i < 180; i++) Step(input: Vector2.up);
-            Assert.Less(game.Player.transform.position.y, 2.5f); Assert.Less(game.Player.transform.position.z, 21.5f); yield return null;
+            Assert.Less(game.Player.transform.position.y, WorldBuilder.GroundY(0,22)+2.5f); Assert.Less(game.Player.transform.position.z, 21.5f); yield return null;
         }
         [UnityTest] public IEnumerator GlideSteersDrainsAndEndsOnLanding()
         {
             Position(new Vector3(0, 8, 20)); Assert.IsTrue(T.TryGlide());
             for (int i = 0; i < 250; i++) Step(Vector3.right, Vector2.right);
-            Assert.Greater(game.Player.transform.position.x, 5); Assert.Less(game.Player.transform.position.y, .2f); Assert.AreNotEqual(TraversalState.Glide, T.State); yield return null;
+            Assert.Greater(game.Player.transform.position.x, 5); Assert.Less(game.Player.transform.position.y, WorldBuilder.GroundY(game.Player.transform.position.x,game.Player.transform.position.z)+.3f); Assert.AreNotEqual(TraversalState.Glide, T.State); yield return null;
         }
         [UnityTest] public IEnumerator GlideDamageExhaustionAndPauseTransitionRules()
         {
@@ -77,7 +78,7 @@ namespace WanderingCity.Tests
         }
         [UnityTest] public IEnumerator CoyoteJumpAndBufferedLandingJumpUseRealContact()
         {
-            var platform = GameObject.CreatePrimitive(PrimitiveType.Cube); platform.transform.position = new Vector3(0, 1.5f, 20); platform.transform.localScale = new Vector3(2, 3, 2); Physics.SyncTransforms();
+            var platform = GameObject.CreatePrimitive(PrimitiveType.Cube); platform.transform.position = WorldBuilder.GroundPoint(0,20,1.5f); platform.transform.localScale = new Vector3(2, 3, 2); Physics.SyncTransforms();
             Position(new Vector3(0, 3.1f, 20)); for (int i = 0; i < 15; i++) Step(); Assert.IsTrue(T.Grounded);
             for (int i = 0; i < 100 && T.Grounded; i++) Step(Vector3.right, Vector2.right);
             Assert.IsFalse(T.Grounded); Step(jump: true); Assert.Greater(T.VerticalVelocity, 0, "coyote jump after leaving platform");
@@ -115,7 +116,7 @@ namespace WanderingCity.Tests
             Assert.IsFalse(game.Exploration.Teleport("mesa-beacon"));
             var item = game.World.Interactions.Find(i => i.Id == "mesa-beacon"); Position(new Vector3(75, 14.1f, 8)); item.Interact();
             Assert.Contains("mesa-beacon", game.State.activatedTeleportIds); Position(Vector3.up); Assert.IsTrue(game.Exploration.Teleport("mesa-beacon")); Assert.Greater(game.Player.transform.position.y, 14);
-            var obstruction = GameObject.CreatePrimitive(PrimitiveType.Cube); obstruction.transform.position = new Vector3(75, 15, 8); obstruction.transform.localScale = new Vector3(3, 2, 3); Physics.SyncTransforms();
+            var obstruction = GameObject.CreatePrimitive(PrimitiveType.Cube); obstruction.transform.position = WorldBuilder.GroundPoint(75,8,15); obstruction.transform.localScale = new Vector3(3, 2, 3); Physics.SyncTransforms();
             Position(Vector3.up); Assert.IsFalse(game.Exploration.Teleport("mesa-beacon")); Assert.Less(game.Player.transform.position.x, 1); yield return null;
         }
         [UnityTest] public IEnumerator TriggerDiscoveryTreasurePuzzleAndReloadArePersistent()

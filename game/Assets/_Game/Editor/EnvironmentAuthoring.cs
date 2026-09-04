@@ -37,6 +37,7 @@ namespace WanderingCity.Editor
             GenerateEnvironmentPrefabs(materials);
             GenerateLandmarkPrefabs(materials);
             GenerateTravelerPrefab(materials);
+            OpenWorldAuthoring.Generate(materials, terrainData);
             CreateAuthoredEnvironmentPrefab(terrainData);
         }
 
@@ -230,21 +231,22 @@ namespace WanderingCity.Editor
             // 11. Skybox material — persistent asset for explicit skybox configuration
             string skyMatPath = MaterialsDir + "/OutdoorSky.mat";
             var matSky = AssetDatabase.LoadAssetAtPath<Material>(skyMatPath);
-            if (matSky == null)
-            {
-                var skyShader = Shader.Find("Skybox/Procedural");
-                matSky = new Material(skyShader);
-                matSky.name = "OutdoorSky";
-                matSky.SetFloat("_SunDisk", 2); // High quality sun disk
-                matSky.SetFloat("_SunSize", 0.04f);
-                matSky.SetFloat("_SunSizeConvergence", 5f);
-                matSky.SetFloat("_AtmosphereThickness", 1.05f);
-                matSky.SetColor("_SkyTint", new Color(0.52f, 0.65f, 0.82f));
-                matSky.SetColor("_GroundColor", new Color(0.37f, 0.42f, 0.35f));
-                matSky.SetFloat("_Exposure", 1.25f);
-                AssetDatabase.CreateAsset(matSky, skyMatPath);
-            }
+            var skyShader = Shader.Find("WanderingCity/StylizedSky");
+            if (matSky == null) {matSky = new Material(skyShader); AssetDatabase.CreateAsset(matSky, skyMatPath);}
+            matSky.shader = skyShader;
+            EditorUtility.SetDirty(matSky);
+            matSky.SetFloat("_Coverage",.4f);
+            matSky.SetFloat("_Softness",.16f);
             dict["Sky"] = matSky;
+            foreach(var material in dict.Values)
+            {
+                if(material.HasProperty("_RimColor")) material.SetColor("_RimColor", new Color(.12f,.16f,.13f));
+                if(material.HasProperty("_RimThreshold")) material.SetFloat("_RimThreshold",.65f);
+                EditorUtility.SetDirty(material);
+            }
+            matFoliage.SetColor("_BaseColor",new Color(.32f,.51f,.27f));
+            matRock.SetFloat("_WorldDetail",1);matCliff.SetFloat("_WorldDetail",1);
+
 
             AssetDatabase.SaveAssets();
             return dict;
@@ -843,6 +845,11 @@ namespace WanderingCity.Editor
                 return new Color(0.5f + dx, 0.5f + dy, 1f);
             }, true);
 
+            CreateTexture(ArtDir + "/Rock_SoftAlbedo.png",256,256,(x,y)=>
+            {
+                float n=Mathf.PerlinNoise(x*.03f,y*.03f)*.015f;
+                return new Color(.44f+n,.49f+n,.47f+n);
+            },false);
             AssetDatabase.Refresh();
         }
 
@@ -894,48 +901,36 @@ namespace WanderingCity.Editor
                     layer.smoothness = 0.1f;
                     AssetDatabase.CreateAsset(layer, layerPath);
                 }
+                layer.normalScale = name=="Rock"?.12f:.35f;
+                if(name=="Rock")layer.diffuseTexture=AssetDatabase.LoadAssetAtPath<Texture2D>(ArtDir+"/Rock_SoftAlbedo.png");
+                EditorUtility.SetDirty(layer);
                 layers[i] = layer;
             }
             AssetDatabase.SaveAssets();
             return layers;
         }
 
-        // Terrain data version. Increment to force one-time regeneration after height model changes.
-        // v4 = stable flat lowland corridor (<0.04m) with perimeter mountain ranges.
-        const int TerrainDataVersion = 4;
-        const string TerrainVersionKey = "WanderingCity_TerrainDataVersion";
-
         public static TerrainData GenerateTerrainData(TerrainLayer[] layers)
         {
             var terrainData = AssetDatabase.LoadAssetAtPath<TerrainData>(TerrainDataPath);
-            int storedVersion = EditorPrefs.GetInt(TerrainVersionKey, 0);
-
-            if (terrainData != null && storedVersion >= TerrainDataVersion && terrainData.size.y == 100f)
-                return terrainData;
-
-            // One-time regeneration: delete stale data if version mismatch or wrong height dimension
-            if (terrainData != null && (storedVersion < TerrainDataVersion || terrainData.size.y != 100f))
-            {
-                AssetDatabase.DeleteAsset(TerrainDataPath);
-                terrainData = null;
-            }
-
-            terrainData = new TerrainData();
-            terrainData.name = "WorldTerrainData";
-            int res = 257;
+            if (terrainData != null && terrainData.name == "OpenWorld_v8") return terrainData;
+            bool create = terrainData == null;
+            if (create) terrainData = new TerrainData();
+            terrainData.name = "OpenWorld_v8";
+            int res = TerrainHeightModel.Resolution;
             terrainData.heightmapResolution = res;
-            terrainData.size = new Vector3(500, 100, 500);
+            terrainData.size = new Vector3(TerrainHeightModel.Size, TerrainHeightModel.Height, TerrainHeightModel.Size);
 
             float[,] heights = new float[res, res];
             for (int z = 0; z < res; z++)
             {
                 for (int x = 0; x < res; x++)
                 {
-                    float worldX = -250f + (x / (float)(res - 1)) * 500f;
-                    float worldZ = -150f + (z / (float)(res - 1)) * 500f;
+                    float worldX = TerrainHeightModel.Origin.x + (x / (float)(res - 1)) * TerrainHeightModel.Size;
+                    float worldZ = TerrainHeightModel.Origin.z + (z / (float)(res - 1)) * TerrainHeightModel.Size;
 
-                    float h = CalculateHeight(worldX, worldZ);
-                    heights[z, x] = Mathf.Clamp01(h / 100f);
+                    float h = TerrainHeightModel.Sample(worldX, worldZ);
+                    heights[z, x] = Mathf.Clamp01(h / TerrainHeightModel.Height);
                 }
             }
             terrainData.SetHeights(0, 0, heights);
@@ -951,8 +946,8 @@ namespace WanderingCity.Editor
                 {
                     float normX = x / (float)(alphaRes - 1);
                     float normZ = z / (float)(alphaRes - 1);
-                    float worldX = -250f + normX * 500f;
-                    float worldZ = -150f + normZ * 500f;
+                    float worldX = TerrainHeightModel.Origin.x + normX * TerrainHeightModel.Size;
+                    float worldZ = TerrainHeightModel.Origin.z + normZ * TerrainHeightModel.Size;
 
                     float steepness = terrainData.GetSteepness(normX, normZ);
                     float worldY = terrainData.GetInterpolatedHeight(normX, normZ);
@@ -961,7 +956,8 @@ namespace WanderingCity.Editor
                     float roadFactor = Mathf.Clamp01(1f - (roadDist / 3.5f));
 
                     float rockWeight = Mathf.Clamp01((steepness - 22f) / 18f);
-                    float dryGrassWeight = Mathf.Clamp01((worldY - 20f) / 30f) * (1f - rockWeight);
+                    float macro = Mathf.PerlinNoise(worldX*.009f+51,worldZ*.009f+51);
+                    float dryGrassWeight = Mathf.Clamp01((worldY - 20f) / 30f + macro*.14f) * (1f - rockWeight);
                     float dirtWeight = roadFactor * (1f - rockWeight);
                     float grassWeight = Mathf.Max(0f, 1f - rockWeight - dryGrassWeight - dirtWeight);
 
@@ -981,40 +977,10 @@ namespace WanderingCity.Editor
             }
             terrainData.SetAlphamaps(0, 0, alphas);
 
-            AssetDatabase.CreateAsset(terrainData, TerrainDataPath);
-            EditorPrefs.SetInt(TerrainVersionKey, TerrainDataVersion);
+            if (create) AssetDatabase.CreateAsset(terrainData, TerrainDataPath);
+            EditorUtility.SetDirty(terrainData);
             AssetDatabase.SaveAssets();
             return terrainData;
-        }
-
-        static float CalculateHeight(float wx, float wz)
-        {
-            // Active gameplay corridor covers base camp (0,0), forest (-48, 65), quarry (64, 59), ruins (20, 139), canyon (81, 32), shelf approach (27, -8)
-            bool inLowlandCorridor = (wx >= -78f && wx <= 92f && wz >= -32f && wz <= 162f);
-            if (inLowlandCorridor)
-            {
-                // Very subtle micro-relief (< 0.04m) ensuring clean flat lowland floor
-                return Mathf.PerlinNoise(wx * 0.05f + 20, wz * 0.05f + 20) * 0.03f;
-            }
-
-            // Outside active gameplay corridor: rise into Midland (15-40m), Highland (40-80m), Landmark/Peaks (80m+)
-            float edgeDistX = 0f;
-            if (wx > 92f) edgeDistX = wx - 92f;
-            else if (wx < -78f) edgeDistX = -78f - wx;
-
-            float edgeDistZ = 0f;
-            if (wz > 162f) edgeDistZ = wz - 162f;
-            else if (wz < -32f) edgeDistZ = -32f - wz;
-
-            float edgeDist = Mathf.Sqrt(edgeDistX * edgeDistX + edgeDistZ * edgeDistZ);
-            if (edgeDist > 0f)
-            {
-                float mountainSlope = Mathf.SmoothStep(0f, 120f, edgeDist) * 78f;
-                float noise = Mathf.PerlinNoise(wx * 0.015f + 100, wz * 0.015f + 100) * 18f;
-                return mountainSlope + noise * Mathf.Clamp01(edgeDist / 30f);
-            }
-
-            return 0f;
         }
 
         static float MinPathDistance(Vector2 p)
@@ -1068,7 +1034,7 @@ namespace WanderingCity.Editor
             var envRoot = new GameObject("Environment");
             var terrainGo = new GameObject("Terrain");
             terrainGo.transform.SetParent(envRoot.transform);
-            terrainGo.transform.position = new Vector3(-250, 0, -150);
+            terrainGo.transform.position = TerrainHeightModel.Origin;
 
             var terrain = terrainGo.AddComponent<Terrain>();
             terrain.terrainData = terrainData;

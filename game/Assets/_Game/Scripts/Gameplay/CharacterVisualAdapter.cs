@@ -236,7 +236,14 @@ namespace WanderingCity
 
         static GameObject CreatePart(string name, PrimitiveType type, Transform parent, Vector3 localPos, Vector3 localScale, Material mat)
         {
-            var go = GameObject.CreatePrimitive(type);
+            GameObject go;
+            if(DevelopmentVisualMode.UseFallbackPrimitives) go=GameObject.CreatePrimitive(type);
+            else
+            {
+                go=new GameObject(name);
+                go.AddComponent<MeshFilter>().sharedMesh=OriginalMesh.Loft(name,8,new[]{.4f,.5f,.42f},0,6,.04f);
+                go.AddComponent<MeshRenderer>();
+            }
             go.name = name;
             go.transform.SetParent(parent, false);
             go.transform.localPosition = localPos;

@@ -1,5 +1,5 @@
 {
   "name": "WanderingCity.PlayMode",
-  "references": ["WanderingCity", "Unity.AI.Navigation", "Unity.Cinemachine", "Unity.ugui", "Unity.TextMeshPro"],
+  "references": ["WanderingCity", "Unity.AI.Navigation", "Unity.Cinemachine", "Unity.ugui", "Unity.TextMeshPro", "Unity.RenderPipelines.Universal.Runtime"],
   "optionalUnityReferences": ["TestAssemblies"]
 }

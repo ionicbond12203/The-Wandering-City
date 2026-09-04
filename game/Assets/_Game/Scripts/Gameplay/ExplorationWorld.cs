@@ -31,7 +31,8 @@ namespace WanderingCity
             shelf.AddComponent<ClimbSurface>();
 
             // Safe long ramps reach both heights without stamina
-            Ramp("Shelf walking approach", new Vector3(27, shelfGround + shelfHeight * 0.5f, -8), 30, shelfHeight, 8, geometry);
+            float approachGround = WorldBuilder.GroundY(12,-8);
+            Ramp("Shelf walking approach", new Vector3(27, (approachGround+shelfGround+shelfHeight)*.5f, -8), 30, shelfGround+shelfHeight-approachGround, 8, geometry);
             Ramp("Mesa walking approach", new Vector3(53, (shelfGround + shelfHeight + mesaGround + mesaHeight) * 0.5f, 8), 28, (mesaGround + mesaHeight) - (shelfGround + shelfHeight), 7, geometry);
 
             float connGround = WorldBuilder.GroundY(46, 4, 0);
@@ -90,8 +91,12 @@ namespace WanderingCity
             Color color = type == PoiType.Treasure ? new Color(.96f, .72f, .25f) : new Color(.3f, .83f, .83f);
             if (type == PoiType.Landmark || type == PoiType.TeleportPoint)
             {
-                world.Shape(name + " shaft", PrimitiveType.Cylinder, position + Vector3.up * 3, new Vector3(.6f, 3, .6f), color, go.transform, false);
-                world.Shape(name + " split crown", PrimitiveType.Cube, position + Vector3.up * 6, new Vector3(3, .6f, 1), color, go.transform, false);
+                float height = type==PoiType.TeleportPoint?2f:6f;
+                var shaft=world.Shape(name+" stone",PrimitiveType.Cube,position+Vector3.up*(height*.5f-.6f),new Vector3(.6f,height,.6f),new Color(.37f,.52f,.55f),go.transform,false);
+                shaft.GetComponent<MeshFilter>().sharedMesh=OriginalMesh.Loft("Waystone",7,new[]{.5f,.42f,.3f},.08f,17,.12f);
+                var crown=world.Shape(name+" crystal",PrimitiveType.Cube,position+Vector3.up*(height-.3f),new Vector3(.55f,.8f,.55f),color,go.transform,false);
+                crown.GetComponent<MeshFilter>().sharedMesh=OriginalMesh.Rock(18);
+
             }
             if (type == PoiType.TeleportPoint || type == PoiType.Treasure)
             {

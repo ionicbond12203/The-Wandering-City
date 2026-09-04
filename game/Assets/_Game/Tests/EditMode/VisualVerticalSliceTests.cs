@@ -143,25 +143,25 @@ namespace WanderingCity.Tests.EditMode
         }
 
         [Test]
-        public void TerrainElevation_LowlandCorridorAndPerimeterRanges()
+        public void TerrainElevation_RollingRegionsAndOpenValleys()
         {
-            var terrainData = AssetDatabase.LoadAssetAtPath<TerrainData>(EnvironmentAuthoring.TerrainDataPath);
-            Assert.IsNotNull(terrainData, "WorldTerrainData asset must exist.");
-            Assert.AreEqual(500, terrainData.size.x, "Terrain size X must be 500m.");
-            Assert.AreEqual(500, terrainData.size.z, "Terrain size Z must be 500m.");
-            Assert.GreaterOrEqual(terrainData.terrainLayers.Length, 4, "Terrain must have at least 4 layers (Grass, DryGrass, Dirt, Rock).");
-
-            // Lowland sample at (0,0) world coords -> normalized (0.5, 0.3)
-            float normLowlandX = (0f - (-250f)) / 500f;
-            float normLowlandZ = (0f - (-150f)) / 500f;
-            float hLowland = terrainData.GetInterpolatedHeight(normLowlandX, normLowlandZ);
-            Assert.Less(hLowland, 0.2f, "Lowland gameplay corridor height must remain flat (<0.2m).");
-
-            // Mountain perimeter sample at (-240, 320) -> outside corridor
-            float normPerimeterX = (-240f - (-250f)) / 500f;
-            float normPerimeterZ = (320f - (-150f)) / 500f;
-            float hPerimeter = terrainData.GetInterpolatedHeight(normPerimeterX, normPerimeterZ);
-            Assert.Greater(hPerimeter, 15f, "Perimeter terrain must rise into midland/highland (>15m).");
+            var data = AssetDatabase.LoadAssetAtPath<TerrainData>(EnvironmentAuthoring.TerrainDataPath);
+            Assert.AreEqual(1024, data.size.x);
+            Assert.AreEqual(160, data.size.y);
+            Assert.GreaterOrEqual(data.heightmapResolution, 513);
+            Assert.Greater(TerrainHeightModel.Sample(20,142) - TerrainHeightModel.Sample(0,0), 20);
+            Assert.Greater(TerrainHeightModel.Sample(-58,70), 6);
+            Assert.Greater(TerrainHeightModel.Sample(73,66), 12);
+            foreach (var p in new[] { new Vector2(0,-200), new Vector2(-200,0), new Vector2(0,320) })
+                Assert.Less(TerrainHeightModel.Sample(p.x,p.y), 35, "Open horizon corridor");
+            for (int z=-400; z<590; z+=8)
+            for (int x=-500; x<500; x+=8)
+            {
+                float h = TerrainHeightModel.Sample(x,z);
+                Assert.AreEqual(h, TerrainHeightModel.Sample(x,z));
+                Assert.That(h, Is.InRange(.4f,148f));
+                Assert.Less(Mathf.Abs(h-TerrainHeightModel.Sample(x+.5f,z)), 2f, "No discontinuous walls");
+            }
         }
 
         [Test]

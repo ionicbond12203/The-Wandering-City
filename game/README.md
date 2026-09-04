@@ -2,6 +2,8 @@
 
 按 `docs/产品设计文档-MVP.md` 与 `docs/技术方案-MVP.md` 实现的 Windows 单机第三人称冒险原型。`demo/` 仍是独立网页参考，不是正式游戏入口。
 
+当前版本已重建 1024m 开放地形、Terrain Detail 草地、原创树石网格、远山和动态天空，并调整地面锚点与相机。实现、82 项测试、真实 Build 截图和性能边界见 [开放世界视觉重建记录](../docs/开放世界视觉重建记录.md)。角色及部分交互物仍为原型美术。
+
 ## 启动
 
 - 已构建版本：运行 `game/Builds/Windows/The Wandering City.exe`。分享时复制整个 Windows 文件夹，不能只复制 exe。

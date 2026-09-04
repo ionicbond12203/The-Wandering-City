@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.Profiling;
+using Unity.Profiling;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 
@@ -15,7 +16,7 @@ namespace WanderingCity
     public sealed class BuildSmoke : MonoBehaviour
     {
         static string output;
-        RenderTexture target;
+
         float deadline;
         void OnEnable() { deadline = Time.realtimeSinceStartup + 120; Application.logMessageReceived += OnLog; }
         void OnDisable() { Application.logMessageReceived -= OnLog; }
@@ -34,13 +35,42 @@ namespace WanderingCity
         {
             yield return new WaitUntil(() => GameSession.Current != null && GameSession.Current.Hud != null);
             var game = GameSession.Current;
-            target = new RenderTexture(1920, 1080, 24); target.Create();
+            Camera.main.GetComponent<OrbitCamera>().AcceptInput = false;
             var canvas = FindFirstObjectByType<Canvas>(); canvas.renderMode = RenderMode.ScreenSpaceCamera; canvas.worldCamera = Camera.main; canvas.planeDistance = 1;
             for (int i = 0; i < 30; i++) yield return null;
             yield return Capture("01-title.png");
             game.Begin(false); game.SetMenu(false);
             for (int i = 0; i < 60; i++) yield return null;
             yield return Capture("02-camp.png");
+            var orbit = Camera.main.GetComponent<OrbitCamera>();
+            orbit.Pitch = 10;
+            yield return Capture("open-world-spawn.png");
+            string[] directions={"north","east","south","west"};
+            for(int side=0;side<4;side++)
+            {
+                orbit.Yaw=side*90;
+                for(int f=0;f<12;f++) yield return null;
+                yield return Capture("open-world-"+directions[side]+".png");
+            }
+            MoveTo(game,WorldBuilder.GroundPoint(-38,48,.15f));orbit.Yaw=-35;
+            for(int f=0;f<15;f++) yield return null;
+            yield return Capture("open-world-forest.png");
+            var terrain=Terrain.activeTerrain;
+            Require(terrain.terrainData.detailScatterMode==DetailScatterMode.InstanceCountMode,"instance count grass scatter");
+            long detailCount=0;
+            for(int layer=0;layer<terrain.terrainData.detailPrototypes.Length;layer++)
+                foreach(int count in terrain.terrainData.GetDetailLayer(0,0,terrain.terrainData.detailWidth,terrain.terrainData.detailHeight,layer))detailCount+=count;
+            File.WriteAllText(Path.Combine(output,"terrain-details.txt"),"Detail instance density sum: "+detailCount);
+
+            MoveTo(game,WorldBuilder.GroundPoint(45,47,.15f));orbit.Yaw=25;
+            for(int f=0;f<15;f++) yield return null;
+            yield return Capture("open-world-quarry.png");
+            MoveTo(game,WorldBuilder.GroundPoint(0,0,.15f));orbit.Yaw=180;orbit.Pitch=5;
+            orbit.SetDistance(2.7f);
+            for(int f=0;f<20;f++) yield return null;
+            yield return Capture("character-close.png");
+            orbit.SetDistance(4.6f);orbit.Yaw=0;orbit.Pitch=12;
+
             foreach (string page in new[] { "inventory", "map", "craft" }) { game.SetMenu(true, page); for (int i = 0; i < 5; i++) yield return null; yield return Capture("03-" + page + ".png"); }
             game.SetMenu(false);
             for (int i = 0; i < 6; i++) { var item = game.World.Interactions.Find(n => n.Id == "wood-" + i); MoveTo(game, item.transform.position + Vector3.back); item.Interact(); }
@@ -81,11 +111,15 @@ namespace WanderingCity
             float mesaTopY = mesaGround + mesaHeight;
             MoveTo(game, new Vector3(75, mesaTopY + 0.1f, 8)); game.World.Interactions.Find(n => n.Id == "mesa-beacon").Interact(); Require(game.State.activatedTeleportIds.Contains("mesa-beacon"), "activate mesa beacon");
             for (int i = 0; i < 15; i++) yield return null;
+            orbit.Yaw=-65;
+            for(int f=0;f<15;f++)yield return null;
             yield return Capture("07-mesa.png");
+            yield return Capture("open-world-high-viewpoint.png");
             MoveTo(game, new Vector3(81, mesaTopY, 21)); Require(traversal.TryGlide(), "deploy wind sail");
             game.Player.GlideSail.gameObject.SetActive(true);
             for (int i = 0; i < 45; i++) { traversal.Simulate(.02f, Vector3.forward, Vector2.up, false, false, false, false, false, false); yield return null; }
             yield return Capture("08-glide.png");
+            yield return Capture("open-world-glide.png");
             game.Player.GlideSail.gameObject.SetActive(false);
             MoveTo(game, new Vector3(81, canyonGround + 0.1f, 28)); game.World.Interactions.Find(n => n.Id == "echo-west").Interact();
             MoveTo(game, new Vector3(81, canyonGround + 0.1f, 32)); game.World.Interactions.Find(n => n.Id == "echo-east").Interact();
@@ -96,18 +130,31 @@ namespace WanderingCity
             game.SetMenu(true, "map"); for (int i = 0; i < 5; i++) yield return null; yield return Capture("09-exploration-map.png");
             game.SetMenu(false); Require(game.Exploration.Teleport("mesa-beacon"), "teleport to safe spawn");
             game.Player.enabled = true;
+            using var batches = ProfilerRecorder.StartNew(ProfilerCategory.Render,"Batches Count");
+            using var draws = ProfilerRecorder.StartNew(ProfilerCategory.Render,"Draw Calls Count");
+            using var allocations = ProfilerRecorder.StartNew(ProfilerCategory.Memory,"GC Allocated In Frame");
+            using var mainThread = ProfilerRecorder.StartNew(ProfilerCategory.Internal,"Main Thread");
+            double batchSum=0,drawSum=0,allocSum=0,cpuSum=0,gpuSum=0; int gpuSamples=0;
+            var timings=new FrameTiming[1];
             var frameTimes = new List<float>(); long gcBefore = GC.CollectionCount(0); double start = Time.realtimeSinceStartupAsDouble;
-            for (int i = 0; i < 300; i++) { RenderFrame(); yield return null; frameTimes.Add(Time.unscaledDeltaTime * 1000); }
+            for (int i = 0; i < 300; i++)
+            {
+                FrameTimingManager.CaptureFrameTimings();
+                yield return null;
+                frameTimes.Add(Time.unscaledDeltaTime * 1000);
+                batchSum+=batches.LastValue;drawSum+=draws.LastValue;allocSum+=allocations.LastValue;cpuSum+=mainThread.LastValue/1000000.0;
+                if(FrameTimingManager.GetLatestTimings(1,timings)>0 && timings[0].gpuFrameTime>0){gpuSum+=timings[0].gpuFrameTime;gpuSamples++;}
+            }
             frameTimes.Sort();
-            File.WriteAllText(Path.Combine(output, "smoke-result.json"), JsonUtility.ToJson(new Report { passed = true, unity = Application.unityVersion, device = SystemInfo.graphicsDeviceName, cpu = SystemInfo.processorType, width = Screen.width, height = Screen.height, averageMs = frameTimes.Average(), p95Ms = frameTimes[(int)(frameTimes.Count * .95f)], fps = (float)(300 / (Time.realtimeSinceStartupAsDouble - start)), allocatedMB = Profiler.GetTotalAllocatedMemoryLong() / 1048576f, gcCollections = (int)(GC.CollectionCount(0) - gcBefore), objective = Rules.Objective(game.State) }, true));
+            File.WriteAllText(Path.Combine(output, "smoke-result.json"), JsonUtility.ToJson(new Report { passed = true, batches = batches.Valid && batchSum>0?(float)(batchSum/300):-1, drawCalls = draws.Valid && drawSum>0?(float)(drawSum/300):-1, gcBytesPerFrame=allocations.Valid?(float)(allocSum/300):-1, cpuMainThreadMs=mainThread.Valid?(float)(cpuSum/300):-1, gpuMs=gpuSamples>0?(float)(gpuSum/gpuSamples):-1, unity = Application.unityVersion, device = SystemInfo.graphicsDeviceName, cpu = SystemInfo.processorType, width = Screen.width, height = Screen.height, averageMs = frameTimes.Average(), p95Ms = frameTimes[(int)(frameTimes.Count * .95f)], fps = (float)(300 / (Time.realtimeSinceStartupAsDouble - start)), allocatedMB = Profiler.GetTotalAllocatedMemoryLong() / 1048576f, gcCollections = (int)(GC.CollectionCount(0) - gcBefore), objective = Rules.Objective(game.State) }, true));
             Debug.Log("WANDERING_CITY_SMOKE_OK"); Application.Quit(0);
         }
         void MoveTo(GameSession game, Vector3 position) { game.State.x = position.x; game.State.y = position.y; game.State.z = position.z; game.Player.RestorePosition(); Physics.SyncTransforms(); }
-        void RenderFrame() { Canvas.ForceUpdateCanvases(); RenderPipeline.SubmitRenderRequest(Camera.main, new UniversalRenderPipeline.SingleCameraRequest { destination = target }); }
         IEnumerator Capture(string name)
         {
-            yield return new WaitForEndOfFrame(); RenderFrame();
-            var previous = RenderTexture.active; RenderTexture.active = target; var texture = new Texture2D(1920, 1080, TextureFormat.RGB24, false); texture.ReadPixels(new Rect(0, 0, 1920, 1080), 0, 0); texture.Apply(); RenderTexture.active = previous;
+            yield return new WaitForEndOfFrame();
+            var texture = ScreenCapture.CaptureScreenshotAsTexture();
+            Require(texture.width==1920 && texture.height==1080,"native 1080p framebuffer");
             var samples = texture.GetPixels32(); Require(samples.Any(p => p.r > 40 || p.g > 40 || p.b > 40), "non-black rendered image " + name);
             // Magenta detection: fail if >1% of pixels are magenta (shader error indicator)
             int magentaCount = 0;
@@ -117,9 +164,9 @@ namespace WanderingCity
             Require(magentaRatio <= 0.01f, "zero-magenta " + name);
             File.WriteAllBytes(Path.Combine(output, name), texture.EncodeToPNG()); Destroy(texture); yield return null;
         }
-        void OnDestroy() { if (target != null) { target.Release(); Destroy(target); } }
+
         void Require(bool result, string step) { if (!result) { Debug.LogError("SMOKE FAILED: " + step); File.WriteAllText(Path.Combine(output, "smoke-failure.txt"), step); Application.Quit(1); throw new InvalidOperationException(step); } }
-        [Serializable] sealed class Report { public bool passed; public string renderMode = "URP offscreen, 300 frames; not a full gameplay benchmark"; public string unity, device, cpu, objective; public int width, height, gcCollections; public float averageMs, p95Ms, fps, allocatedMB; }
+        [Serializable] sealed class Report { public bool passed; public string renderMode = "URP native game framebuffer, 300 frames after screenshots; unavailable counters = -1; not a full gameplay benchmark"; public string unity, device, cpu, objective; public int width, height, gcCollections; public float averageMs, p95Ms, fps, allocatedMB, batches, drawCalls, gcBytesPerFrame, cpuMainThreadMs, gpuMs; }
     }
 }
 #endif

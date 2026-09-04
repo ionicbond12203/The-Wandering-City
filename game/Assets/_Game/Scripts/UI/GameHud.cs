@@ -36,19 +36,19 @@ namespace WanderingCity
             font = TMP_FontAsset.CreateFontAsset(osFont, 32, 5, UnityEngine.TextCore.LowLevel.GlyphRenderMode.SDFAA, 2048, 2048, AtlasPopulationMode.Dynamic);
             font.isMultiAtlasTexturesEnabled = true;
             new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
-            Box(root, "Location panel", 40, 36, 390, 105, new Color(.08f, .16f, .17f, .88f));
+            Box(root, "Location panel", 40, 36, 390, 105, new Color(.08f, .16f, .17f, .28f));
             Label(root, "THE WANDERING CITY", 64, 53, 360, 28, 18, gold);
             location = Label(root, "旅人据点", 64, 84, 355, 46, 30, ivory);
-            Box(root, "Objective panel", 40, 160, 390, 158, new Color(.08f, .16f, .17f, .84f));
+            Box(root, "Objective panel", 40, 160, 390, 158, new Color(.08f, .16f, .17f, .22f));
             objective = Label(root, "", 62, 180, 345, 122, 22, ivory);
-            
+
             // MiniMap placeholder in top-right
             Box(root, "MiniMap border", 1730, 36, 150, 150, new Color(.08f, .16f, .17f, .90f));
             Box(root, "MiniMap center", 1734, 40, 142, 142, new Color(.11f, .18f, .19f, .96f));
             Label(root, "MINIMAP", 1730, 48, 150, 22, 13, gold, TextAlignmentOptions.Center);
             Label(root, "◇", 1730, 96, 150, 28, 22, ivory, TextAlignmentOptions.Center);
             Label(root, "M 全图", 1730, 152, 150, 22, 13, gold, TextAlignmentOptions.Center);
-            Label(root, "Tab 背包   Esc 暂停", 1430, 45, 280, 36, 19, ivory, TextAlignmentOptions.Right);
+            if (DevelopmentVisualMode.Enabled) Label(root, "Tab 背包   Esc 暂停", 1430, 45, 280, 36, 19, ivory, TextAlignmentOptions.Right);
 
             Label(root, "N  /  北方遗迹", 770, 35, 380, 30, 20, gold, TextAlignmentOptions.Center);
             status = Label(root, "", 60, 924, 490, 45, 22, ivory);
@@ -87,6 +87,7 @@ namespace WanderingCity
             hotbar.text = string.Join("     ", s.hotbar.Select((id, i) => (s.selectedSlot == i ? "<color=#E4BA68>" : "") + (i + 1) + " " + ItemName(id) + " ×" + s.Count(id) + (s.selectedSlot == i ? "</color>" : "")));
             prompt.text = session.Building ? "建造 / " + ItemName(session.BuildKind) + " ×" + s.Count(session.BuildKind) + "\n1 地板   2 墙体   3 屋顶   R 旋转   左键放置   X 拆除   B 退出" : session.Target != null && !session.Paused ? "[ E ]  " + session.Target.Label : "";
             notice.text = Time.unscaledTime < session.NoticeUntil ? session.Notice : "";
+            tutorialGroup.gameObject.SetActive(DevelopmentVisualMode.Enabled);
             if (session.Started && !session.Paused && tutorialHint != null)
             {
                 var trav = session.Player != null ? session.Player.Traversal : null;

@@ -24,9 +24,10 @@ namespace WanderingCity
         readonly Collider[] overlaps = new Collider[24];
         public void RestorePosition()
         {
+            Session.State.y = Mathf.Max(Session.State.y, WorldBuilder.GroundY(Session.State.x, Session.State.z) + .1f);
             Controller.enabled = false; transform.SetPositionAndRotation(new Vector3(Session.State.x, Session.State.y, Session.State.z), Quaternion.Euler(0, Session.State.yaw, 0)); Controller.enabled = true;
             // A valid numeric position can still be inside a newly placed structure.
-            if (Physics.CheckCapsule(transform.position + Vector3.up * .5f, transform.position + Vector3.up * 1.5f, .32f, 1 << 0, QueryTriggerInteraction.Ignore)) { Controller.enabled = false; transform.position = Vector3.up; Controller.enabled = true; }
+            if (Physics.CheckCapsule(transform.position + Vector3.up * .5f, transform.position + Vector3.up * 1.5f, .32f, 1 << 0, QueryTriggerInteraction.Ignore)) { Controller.enabled = false; transform.position = WorldBuilder.GroundPoint(0, 0, .15f); Controller.enabled = true; }
             Action = PlayerAction.Move; actionTime = dodgeCooldown = 0; velocity = Vector3.zero; hit.Clear();
             if (Blade != null) Blade.localRotation = Quaternion.identity;
             Traversal?.ResetMotion(true);

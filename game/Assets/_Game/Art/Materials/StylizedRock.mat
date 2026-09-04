@@ -19,7 +19,7 @@ Material:
   m_CustomRenderQueue: -1
   stringTagMap: {}
   disabledShaderPasses: []
-  m_LockedProperties: 
+  m_LockedProperties:
   m_SavedProperties:
     serializedVersion: 3
     m_TexEnvs:
@@ -38,11 +38,12 @@ Material:
     - _RampSmooth: 0.2
     - _RampThreshold: 0
     - _RimPower: 4
-    - _RimThreshold: 0.1
+    - _RimThreshold: 0.65
     - _Smoothness: 0.2
+    - _WorldDetail: 1
     m_Colors:
     - _BaseColor: {r: 0.52, g: 0.58, b: 0.62, a: 1}
-    - _RimColor: {r: 0.75, g: 0.85, b: 0.92, a: 1}
+    - _RimColor: {r: 0.12, g: 0.16, b: 0.13, a: 1}
     - _ShadowColor: {r: 0.32, g: 0.38, b: 0.44, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

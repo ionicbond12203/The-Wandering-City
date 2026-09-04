@@ -6,7 +6,7 @@ Shader "WanderingCity/StylizedGrass"
         _Cutoff("Alpha Cutoff", Range(0.0, 1.0)) = 0.5
         _BaseColor("Root Color", Color) = (0.22, 0.42, 0.18, 1.0)
         _TipColor("Tip Color", Color) = (0.62, 0.82, 0.35, 1.0)
-        
+
         [Header(Wind)]
         _WindSpeed("Wind Speed", Float) = 2.0
         _WindStrength("Wind Strength", Float) = 0.25
@@ -16,10 +16,10 @@ Shader "WanderingCity/StylizedGrass"
 
     SubShader
     {
-        Tags 
-        { 
-            "RenderType" = "TransparentCutout" 
-            "RenderPipeline" = "UniversalPipeline" 
+        Tags
+        {
+            "RenderType" = "TransparentCutout"
+            "RenderPipeline" = "UniversalPipeline"
             "Queue" = "AlphaTest"
         }
         LOD 200
@@ -37,6 +37,7 @@ Shader "WanderingCity/StylizedGrass"
             #pragma target 3.0
             #pragma vertex Vert
             #pragma fragment Frag
+            #pragma multi_compile_fog
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE
             #pragma multi_compile_fragment _ _SHADOWS_SOFT
             #pragma multi_compile_instancing
@@ -81,13 +82,13 @@ Shader "WanderingCity/StylizedGrass"
                 UNITY_TRANSFER_INSTANCE_ID(input, output);
 
                 float3 worldPos = TransformObjectToWorld(input.positionOS.xyz);
-                
+
                 // Wind sway on blade tips (uv.y > 0.1)
                 float swayMask = saturate(input.uv.y);
                 float wave = sin(_Time.y * _WindSpeed + (worldPos.x + worldPos.z) * _WindFrequency);
                 float3 windOffset = normalize(_WindDirection.xyz) * (wave * _WindStrength * swayMask);
-                
-                input.positionOS.xyz += TransformWorldToObjectDir(windOffset);
+
+                input.positionOS.xyz += TransformWorldToObjectDir(windOffset, false);
 
                 VertexPositionInputs vertexInputs = GetVertexPositionInputs(input.positionOS.xyz);
                 VertexNormalInputs normalInputs = GetVertexNormalInputs(input.normalOS);
@@ -115,7 +116,8 @@ Shader "WanderingCity/StylizedGrass"
                 float NdotL = saturate(dot(input.normalWS, mainLight.direction) * 0.5 + 0.5);
                 float3 lighting = mainLight.color * (NdotL * mainLight.shadowAttenuation) + SampleSH(input.normalWS) * 0.5;
 
-                return half4(bladeColor * lighting, 1.0);
+                bladeColor *= .92 + .08*sin(input.positionWS.x*.3+input.positionWS.z*.2);
+                return half4(MixFog(bladeColor * lighting, ComputeFogFactor(TransformWorldToHClip(input.positionWS).z)), 1.0);
             }
             ENDHLSL
         }

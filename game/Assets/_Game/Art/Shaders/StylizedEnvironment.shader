@@ -6,14 +6,15 @@ Shader "WanderingCity/StylizedEnvironment"
         [MainTexture] _BaseMap("Base Map", 2D) = "white" {}
         _BumpMap("Normal Map", 2D) = "bump" {}
         _BumpScale("Normal Scale", Float) = 1.0
+        _WorldDetail("World space rock detail",Range(0,1))=0
         _Smoothness("Smoothness", Range(0.0, 1.0)) = 0.2
         _OcclusionStrength("AO Strength", Range(0.0, 1.0)) = 1.0
-        
+
         [Header(Stylized Lighting)]
         _ShadowColor("Shadow Tint", Color) = (0.45, 0.52, 0.65, 1.0)
         _RampThreshold("Ramp Threshold", Range(-0.5, 0.5)) = 0.0
         _RampSmooth("Ramp Feather", Range(0.01, 0.5)) = 0.2
-        
+
         [Header(Rim Light)]
         _RimColor("Rim Color", Color) = (0.8, 0.9, 1.0, 1.0)
         _RimPower("Rim Power", Range(0.5, 8.0)) = 3.5
@@ -22,10 +23,10 @@ Shader "WanderingCity/StylizedEnvironment"
 
     SubShader
     {
-        Tags 
-        { 
-            "RenderType" = "Opaque" 
-            "RenderPipeline" = "UniversalPipeline" 
+        Tags
+        {
+            "RenderType" = "Opaque"
+            "RenderPipeline" = "UniversalPipeline"
             "Queue" = "Geometry"
         }
         LOD 300
@@ -43,6 +44,7 @@ Shader "WanderingCity/StylizedEnvironment"
             #pragma target 3.0
             #pragma vertex Vert
             #pragma fragment Frag
+            #pragma multi_compile_fog
 
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
             #pragma multi_compile _ _ADDITIONAL_LIGHTS
@@ -80,6 +82,7 @@ Shader "WanderingCity/StylizedEnvironment"
                 float4 _ShadowColor;
                 float4 _RimColor;
                 float _BumpScale;
+                float _WorldDetail;
                 float _Smoothness;
                 float _OcclusionStrength;
                 float _RampThreshold;
@@ -114,8 +117,8 @@ Shader "WanderingCity/StylizedEnvironment"
             {
                 UNITY_SETUP_INSTANCE_ID(input);
 
-                float3 normalWS = normalize(input.normalWS);
-                #if defined(_BUMP_MAP) || 1
+                float3 normalWS = normalize(input.normalWS + _WorldDetail*.035*sin(input.positionWS.yzx*2.3));
+                #if defined(_BUMP_MAP)
                     float4 bumpSample = SAMPLE_TEXTURE2D(_BumpMap, sampler_BumpMap, input.uv);
                     float3 normalTS = UnpackNormalScale(bumpSample, _BumpScale);
                     float3 bitangentWS = cross(normalWS, input.tangentWS.xyz) * input.tangentWS.w;
@@ -126,11 +129,13 @@ Shader "WanderingCity/StylizedEnvironment"
                 float3 viewDirWS = normalize(GetCameraPositionWS() - input.positionWS);
                 float4 albedoMap = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.uv);
                 float3 albedo = albedoMap.rgb * _BaseColor.rgb;
+                albedo *= .94 + .06*sin(input.positionWS.x*.13 + sin(input.positionWS.z*.18));
+                albedo *= lerp(.9, 1.05, saturate(normalWS.y));
 
                 // Main light
                 Light mainLight = GetMainLight(TransformWorldToShadowCoord(input.positionWS));
                 float NdotL = dot(normalWS, mainLight.direction);
-                
+
                 // Stylized Anime Ramp lighting
                 float ramp = smoothstep(_RampThreshold, _RampThreshold + _RampSmooth, NdotL);
                 float shadowAtten = mainLight.shadowAttenuation;
@@ -151,11 +156,11 @@ Shader "WanderingCity/StylizedEnvironment"
                 float3 finalColor = albedo * (diffuseLighting + ambient) + rimLighting;
 
                 #if defined(_SCREEN_SPACE_OCCLUSION)
-                    AmbientOcclusionFactor aoFactor = GetScreenSpaceAmbientOcclusion(ComputeNormalizedDeviceCoordinates(input.positionCS.xyz));
+                    AmbientOcclusionFactor aoFactor = GetScreenSpaceAmbientOcclusion(GetNormalizedScreenSpaceUV(input.positionCS));
                     finalColor *= lerp(1.0, aoFactor.directAmbientOcclusion, _OcclusionStrength);
                 #endif
 
-                return half4(finalColor, _BaseColor.a);
+                return half4(MixFog(finalColor, ComputeFogFactor(TransformWorldToHClip(input.positionWS).z)), _BaseColor.a);
             }
             ENDHLSL
         }
