@@ -2,13 +2,17 @@
 
 按 `docs/产品设计文档-MVP.md` 与 `docs/技术方案-MVP.md` 实现的 Windows 单机第三人称冒险原型。`demo/` 仍是独立网页参考，不是正式游戏入口。
 
+## 长期维护入口
+
+当前整体为 **Prototype**，已有局部技术切片，但未达到完整 Vertical Slice、Production Candidate 或 Production Ready；历史 milestone 名称不是品质认证。先阅读根 [AGENTS.md](../AGENTS.md)、[架构评估](../docs/REPOSITORY_ARCHITECTURE_ASSESSMENT.md)、[AAA 愿景](../docs/AAA_VISION.md)、[工程边界](../docs/AAA_ENGINEERING.md)、[质量门槛](../docs/AAA_QUALITY_BAR.md)、[路线图](../docs/AAA_ROADMAP.md) 与 [技术债及美术阻塞](../docs/TECH_DEBT.md)。每次只执行授权 milestone，完整测试/构建后独立提交；G00 治理不会自动启动下一项。
+
 当前版本已重建 1024m 开放地形、Terrain Detail 草地、原创树石网格、远山和动态天空，并调整地面锚点与相机。实现、82 项测试、真实 Build 截图和性能边界见 [开放世界视觉重建记录](../docs/开放世界视觉重建记录.md)。角色及部分交互物仍为原型美术。
 
 ## 启动
 
 - 已构建版本：运行 `game/Builds/Windows/The Wandering City.exe`。分享时复制整个 Windows 文件夹，不能只复制 exe。
 - 编辑器：Unity Hub 添加本目录，使用 **6000.6.0f1**，打开 `Assets/_Game/Scenes/Boot.unity` 后按 Play。
-- 如果需要重新生成启动场景和默认配置：菜单 `Wandering City > Prepare playable scenes`。该命令会重建 Boot 和 World 两个入口场景；自定义地图应编辑 `WorldBuilder.cs` 或在独立场景中创作。
+- 如果需要准备场景和默认配置：菜单 `Wandering City > Prepare playable scenes`。Boot 缺失时创建，现有 World 会打开并更新生成环境与必需层级；它不是纯只读检查。先保留手工编辑并检查生成差异。当前内容布局仍有 WorldBuilder/ExpansionCatalog 代码内数据，长期迁移方向见工程边界，不应继续把正式内容全部堆入 WorldBuilder。
 - 构建：菜单 `Wandering City > Build Windows`，或 `./Tools/Verify.ps1 -Build`。
 
 Windows 键鼠和风格化几何占位资产采用技术方案的实施基线。锁定编辑器版本来自本机已安装正式版；包依赖提交于 `Packages/manifest.json` 和 `packages-lock.json`。
