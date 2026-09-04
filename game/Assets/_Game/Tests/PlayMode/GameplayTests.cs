@@ -28,7 +28,7 @@ namespace WanderingCity.Tests
         void Teleport(Vector3 p) { game.State.x = p.x; game.State.y = p.y; game.State.z = p.z; game.Player.RestorePosition(); Physics.SyncTransforms(); }
         [UnityTest] public IEnumerator WorldContainsAllLandmarksAndPersistentObjects()
         {
-            yield return null; Assert.AreEqual(10, game.World.Enemies.Count); Assert.AreEqual(65, game.World.Interactions.Count); Assert.IsTrue(game.World.Enemies.All(e => e.Agent.isOnNavMesh)); Assert.IsNotNull(Camera.main); Assert.IsNotNull(game.Hud);
+            yield return null; Assert.AreEqual(10, game.World.Enemies.Count); Assert.AreEqual(71, game.World.Interactions.Count); Assert.IsTrue(game.World.Enemies.All(e => e.Agent.isOnNavMesh)); Assert.IsNotNull(Camera.main); Assert.IsNotNull(game.Hud);
         }
         [UnityTest] public IEnumerator EveryRewardHasAReachableInteractionPosition()
         {

@@ -17,7 +17,7 @@ namespace WanderingCity
         CanvasGroup gameplayGroup;
         TMP_FontAsset font;
         TMP_Text status, objective, prompt, notice, hotbar, location, menuInfo;
-        Image health, damage;
+        Image health, damage, stamina;
         string renderedPage;
         float flash;
         readonly List<(EnemyAgent enemy, RectTransform rect, TMP_Text text)> enemyLabels = new List<(EnemyAgent, RectTransform, TMP_Text)>();
@@ -44,6 +44,9 @@ namespace WanderingCity
             status = Label(root, "", 60, 924, 490, 45, 22, ivory);
             Box(root, "HP track", 60, 975, 355, 10, new Color(.12f, .22f, .22f, .9f));
             health = Box(root, "HP", 60, 975, 355, 10, new Color(.51f, .8f, .6f));
+            Box(root, "Stamina track", 60, 1000, 355, 8, new Color(.12f, .22f, .22f));
+            stamina = Box(root, "Stamina", 60, 1000, 355, 8, new Color(.35f, .79f, .87f));
+            Label(root, "体力 / Shift 冲刺 · C 攀爬 · G 滑翔 · X 松开", 60, 1017, 570, 34, 18, ivory);
             hotbar = Label(root, "", 630, 975, 690, 55, 23, ivory, TextAlignmentOptions.Center);
             Label(root, "WASD 移动  /  Shift 奔跑  /  Space 跳跃\n左键 攻击  /  右键 闪避  /  Q 使用快捷物品", 1380, 948, 480, 75, 19, ivory, TextAlignmentOptions.Right);
             prompt = Label(root, "", 505, 800, 910, 110, 25, ivory, TextAlignmentOptions.Center);
@@ -61,8 +64,10 @@ namespace WanderingCity
             flash = Mathf.Max(0, flash - Time.unscaledDeltaTime); damage.color = new Color(.6f, .08f, .03f, flash * .5f);
             var s = session.State;
             health.rectTransform.sizeDelta = new Vector2(355 * s.hp / 100f, 10);
+            var energy = session.Player.Traversal.Stamina;
+            stamina.rectTransform.sizeDelta = new Vector2(355 * energy.Current / energy.Max, 8);
             status.text = "旅人   " + s.hp + " / 100     长剑 Lv." + s.weaponLevel;
-            location.text = WorldBuilder.RegionName(WorldBuilder.Region(session.Player.transform.position)); objective.text = Rules.Objective(s);
+            location.text = session.Exploration.RegionNameAt(session.Player.transform.position); objective.text = Rules.Objective(s);
             hotbar.text = string.Join("     ", s.hotbar.Select((id, i) => (s.selectedSlot == i ? "<color=#E4BA68>" : "") + (i + 1) + " " + ItemName(id) + " ×" + s.Count(id) + (s.selectedSlot == i ? "</color>" : "")));
             prompt.text = session.Building ? "建造 / " + ItemName(session.BuildKind) + " ×" + s.Count(session.BuildKind) + "\n1 地板   2 墙体   3 屋顶   R 旋转   左键放置   X 拆除   B 退出" : session.Target != null && !session.Paused ? "[ E ]  " + session.Target.Label : "";
             notice.text = Time.unscaledTime < session.NoticeUntil ? session.Notice : "";
@@ -122,13 +127,43 @@ namespace WanderingCity
         }
         void RenderMap()
         {
-            var map = Box(menu, "Map", 170, 280, 1050, 625, new Color(.16f, .26f, .24f)).rectTransform;
-            Vector2 Map(Vector3 p) => new Vector2((p.x + 105) / 210 * 1000 + 25, 590 - (p.z + 15) / 190 * 565);
-            var points = new[] { ("旅人据点 / 工作台", new Vector3(0, 0, 0)), ("风息树林 / 木材", new Vector3(-48, 0, 65)), ("旧日采石场 / 矿石", new Vector3(64, 0, 59)), ("沉眠营地 / 星核", new Vector3(20, 0, 135)) };
-            foreach (var pair in new[] { (0, 1), (0, 2), (1, 3), (2, 3) }) { Vector2 a = Map(points[pair.Item1].Item2), b = Map(points[pair.Item2].Item2); var road = Box(map, "Route", a.x, a.y, Vector2.Distance(a, b), 4, new Color(.54f, .57f, .4f)); road.rectTransform.localRotation = Quaternion.Euler(0, 0, -Mathf.Atan2(b.y - a.y, b.x - a.x) * Mathf.Rad2Deg); }
-            foreach (var p in points) { var xy = Map(p.Item2); Box(map, "Landmark", xy.x - 8, xy.y - 8, 16, 16, gold); Label(map, p.Item1, xy.x - 125, xy.y + 15, 285, 45, 21, ivory, TextAlignmentOptions.Center); }
-            Vector2 player = Map(session.Player.transform.position); Box(map, "You", player.x - 7, player.y - 7, 14, 14, Color.white);
-            Label(menu, "白点 / 你的位置\n\n林间道路通向北方遗迹。\n树林与矿区可自由选择先后。\n偏离道路，也许会有新的发现。\n\n营地守卫\n" + session.State.defeated.Count(id => id.StartsWith("enemy-camp-")) + " / 5 已击败\n\n宝箱\n" + session.State.claimed.Count(id => id.StartsWith("chest-")) + " / 3 已发现", 1300, 315, 430, 560, 26, ivory);
+            var viewport = Box(menu, "Exploration map viewport", 170, 280, 1050, 625, new Color(.07f, .13f, .15f)).rectTransform;
+            viewport.gameObject.AddComponent<RectMask2D>();
+            var map = Box(viewport, "Map content", 0, 0, 1050, 625, new Color(.12f, .2f, .2f)).rectTransform;
+            var navigation = viewport.gameObject.AddComponent<ExplorationMapInput>(); navigation.Content = map;
+            Vector2 Map(Vector3 p) => new Vector2((p.x + 110) / 220 * 1050, 625 - (p.z + 50) / 230 * 625);
+            foreach (var region in session.Exploration.Regions)
+            {
+                var bounds = region.GetComponent<BoxCollider>().bounds;
+                Vector2 top = Map(new Vector3(bounds.min.x, 0, bounds.max.z));
+                Vector2 bottom = Map(new Vector3(bounds.max.x, 0, bounds.min.z));
+                bool discovered = session.State.discoveredRegionIds.Contains(region.Id);
+                var area = Box(map, region.Id, top.x, top.y, bottom.x - top.x, bottom.y - top.y, discovered ? new Color(.24f, .36f, .3f) : new Color(.06f, .1f, .12f)); area.raycastTarget = false;
+                Label(map, discovered ? region.DisplayName : "未踏足", top.x + 8, top.y + 8, bottom.x - top.x - 10, 32, 16, discovered ? ivory : Color.gray);
+            }
+            // Old MVP regions retain their existing discovery history.
+            foreach (var point in new[] { ("forest", new Vector3(-48, 0, 65)), ("quarry", new Vector3(64, 0, 59)), ("ruins", new Vector3(20, 0, 135)), ("camp", Vector3.zero) })
+            {
+                if (!session.State.visited.Contains(point.Item1)) continue;
+                var p = Map(point.Item2); Label(map, WorldBuilder.RegionName(point.Item1), p.x - 70, p.y, 180, 30, 18, ivory);
+            }
+            int row = 0;
+            foreach (var poi in session.Exploration.Points.Values)
+            {
+                if (!session.State.discoveredPOIIds.Contains(poi.Id)) continue;
+                var p = Map(poi.transform.position);
+                var marker = Box(map, poi.Id, p.x - 5, p.y - 5, 10, 10, poi.Completed ? new Color(.3f, .9f, .85f) : gold); marker.raycastTarget = false;
+                Label(map, poi.DisplayName, p.x + 9, p.y - 6, 180, 36, 14, ivory);
+                if (poi.Type == PoiType.TeleportPoint)
+                {
+                    string id = poi.Id;
+                    if (session.State.activatedTeleportIds.Contains(id)) Button(menu, "传送 / " + poi.DisplayName, 1280, 430 + row++ * 80, 430, () => session.Exploration.Teleport(id));
+                    else Label(menu, poi.DisplayName + " / 待激活", 1280, 430 + row++ * 80, 430, 70, 22, gold);
+                }
+            }
+            Vector2 player = Map(session.Player.transform.position); Box(map, "You", player.x - 7, player.y - 7, 14, 14, Color.white).raycastTarget = false;
+            Label(menu, "白点 / 旅人   青色 / 已完成\n滚轮缩放 · 拖拽平移\n信标须先靠近并按 E 激活", 1280, 295, 450, 125, 23, ivory);
+            Label(menu, "兴趣点 " + session.State.discoveredPOIIds.Count + "/" + ExplorationCatalog.PoiIds.Count + "\n区域 " + session.State.discoveredRegionIds.Count + "/3\n行旅匣 " + session.State.openedTreasureIds.Count + "/2\n\n登上台地尖塔，俯瞰风隙峡谷。\n两岸的共鸣石守着另一份回响。", 1280, 670, 450, 250, 23, ivory);
         }
         RectTransform Rect(GameObject go, Transform parent, float x, float y, float w, float h) { var rect = go.GetComponent<RectTransform>(); rect.SetParent(parent, false); rect.anchorMin = rect.anchorMax = new Vector2(0, 1); rect.pivot = new Vector2(0, 1); rect.anchoredPosition = new Vector2(x, -y); rect.sizeDelta = new Vector2(w, h); return rect; }
         Image Box(Transform parent, string name, float x, float y, float w, float h, Color color) { var go = new GameObject(name, typeof(RectTransform), typeof(Image)); Rect(go, parent, x, y, w, h); var image = go.GetComponent<Image>(); image.color = color; return image; }

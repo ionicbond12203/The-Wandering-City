@@ -14,7 +14,9 @@ namespace WanderingCity
         public SaveStore(string path) { this.path = path; }
         public static bool Validate(GameState s)
         {
-            if (s == null || s.version != 1 || s.hp < 0 || s.hp > 100 || s.weaponLevel < 1 || s.weaponLevel > 2 || s.inventory == null || s.inventory.Count > Rules.Slots || s.claimed == null || s.defeated == null || s.visited == null || s.hotbar == null || s.buildings == null) return false;
+            if (s == null || s.version != 2 || s.hp < 0 || s.hp > 100 || s.weaponLevel < 1 || s.weaponLevel > 2 || s.inventory == null || s.inventory.Count > Rules.Slots || s.claimed == null || s.defeated == null || s.visited == null || s.hotbar == null || s.buildings == null) return false;
+            if (!ExplorationRules.ValidIds(s.discoveredPOIIds, ExplorationCatalog.PoiIds) || !ExplorationRules.ValidIds(s.activatedTeleportIds, ExplorationCatalog.TeleportIds) || !ExplorationRules.ValidIds(s.discoveredRegionIds, ExplorationCatalog.RegionIds) || !ExplorationRules.ValidIds(s.openedTreasureIds, ExplorationCatalog.TreasureIds) || !ExplorationRules.ValidIds(s.completedPuzzleIds, ExplorationCatalog.PuzzleIds)) return false;
+            if (s.activatedTeleportIds.Any(id => !s.discoveredPOIIds.Contains(id)) || (s.openedTreasureIds.Contains("canyon-cache") && !s.completedPuzzleIds.Contains("echo-puzzle"))) return false;
             if (s.inventory.Any(p => p == null || !Rules.Items.Contains(p.id) || p.count <= 0 || p.count > Rules.StackLimit) || s.claimed.Any(id => !WorldCatalog.RewardIds.Contains(id)) || s.defeated.Any(id => !WorldCatalog.EnemyIds.Contains(id))) return false;
             if (s.claimed.Count != s.claimed.Distinct().Count() || s.defeated.Count != s.defeated.Distinct().Count() || s.hotbar.Count != 4 || s.hotbar.Any(id => !Rules.Items.Contains(id)) || s.selectedSlot < 0 || s.selectedSlot > 3 || s.visited.Any(id => !new[] { "camp", "forest", "quarry", "ruins" }.Contains(id))) return false;
             if (s.claimed.Contains("camp-reward") && !WorldCatalog.CampEnemies.All(s.defeated.Contains)) return false;
@@ -31,7 +33,20 @@ namespace WanderingCity
         }
         bool Read(string file, out GameState state)
         {
-            state = null; try { var s = new GameState { version = 0, hp = -1, weaponLevel = -1, selectedSlot = -1, inventory = null, claimed = null, defeated = null, visited = null, hotbar = null, buildings = null }; JsonUtility.FromJsonOverwrite(File.ReadAllText(file), s); if (!Validate(s)) return false; SafePosition(s); state = s; return true; } catch (Exception e) when (e is IOException || e is ArgumentException || e is UnauthorizedAccessException) { return false; }
+            state = null;
+            try
+            {
+                var s = new GameState { version = 0, hp = -1, weaponLevel = -1, selectedSlot = -1, inventory = null, claimed = null, defeated = null, visited = null, hotbar = null, buildings = null, discoveredPOIIds = null, activatedTeleportIds = null, discoveredRegionIds = null, openedTreasureIds = null, completedPuzzleIds = null };
+                JsonUtility.FromJsonOverwrite(File.ReadAllText(file), s);
+                if (s.version == 1)
+                {
+                    s.version = 2;
+                    s.discoveredPOIIds = new List<string>(); s.activatedTeleportIds = new List<string>(); s.discoveredRegionIds = new List<string>(); s.openedTreasureIds = new List<string>(); s.completedPuzzleIds = new List<string>();
+                }
+                if (!Validate(s)) return false;
+                SafePosition(s); state = s; return true;
+            }
+            catch (Exception e) when (e is IOException || e is ArgumentException || e is UnauthorizedAccessException) { return false; }
         }
         public bool Load(out GameState state, out string message)
         {
@@ -39,7 +54,7 @@ namespace WanderingCity
             {
                 foreach (string file in new[] { path, path + ".bak" })
                 {
-                    try { if (File.Exists(file)) { var header = JsonUtility.FromJson<VersionHeader>(File.ReadAllText(file)); if (header != null && header.version > 0 && header.version != 1) { Blocked = true; state = null; message = "存档版本不兼容。文件已保护，请使用对应版本游戏，或归档后开始新旅程。"; return false; } } }
+                    try { if (File.Exists(file)) { var header = JsonUtility.FromJson<VersionHeader>(File.ReadAllText(file)); if (header != null && header.version > 0 && header.version != 1 && header.version != 2) { Blocked = true; state = null; message = "存档版本不兼容。文件已保护，请使用对应版本游戏，或归档后开始新旅程。"; return false; } } }
                     catch (Exception e) when (e is IOException || e is ArgumentException || e is UnauthorizedAccessException) { /* Continue to validated backup recovery. */ }
                 }
                 if (Read(path, out state)) { Blocked = false; message = "已恢复旅程"; return true; }

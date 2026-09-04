@@ -1,5 +1,30 @@
 # Unity MVP 实现与验证记录
 
+## Milestone 1 追加验证 / 2026-09-04
+
+开放世界实现与设计细节见《开放世界扩展设计.md》。以下结果来自本次实际运行，不替代下方 MVP 历史记录。
+
+| 命令 / 验证 | 最终结果 | 本地证据 |
+| --- | --- | --- |
+| `game/Tools/Verify.ps1 -Build` / Unity 编译 | 通过 | `artifacts/unity-editmode.log`、`unity-playmode.log`、`unity-build.log` |
+| 同上 / EditMode | 38/38 通过 | `artifacts/editmode-results.xml` |
+| 同上 / PlayMode | 26/26 通过 | `artifacts/playmode-results.xml` |
+| 同上 / Windows x64 Development Build | 通过 | `artifacts/unity-build.log` 中 `WANDERING_CITY_BUILD_OK` |
+| `node --test tests/*.test.mjs`（demo 目录） | 8/8 通过 | 本次终端输出 |
+| `game/Builds/Windows/The Wandering City.exe -qaOutput "<仓库>/artifacts/open-world-final" -logFile "<仓库>/artifacts/open-world-final.log"` | 退出码 0，冒烟通过 | `artifacts/open-world-final/smoke-result.json`、日志 `WANDERING_CITY_SMOKE_OK` |
+
+共 72 项自动测试，无跳过。新增覆盖体力消耗/恢复/延迟/耗尽/夹紧、稳定 ID 重复、发现幂等、信标激活与落点阻挡、宝箱事务与解谜解锁、v1→v2 迁移及备份保留、组件 Unity 脚本绑定；场景覆盖真实墙面抓附、耗尽/受伤掉落、顶部翻越、受阻翻越、滑翔转向与落地、coyote time、跳跃缓冲、低帧率碰撞、地图缩放平移，以及探索状态卸载场景后重新恢复。原战斗、资源、建造、奖励恢复与全部交互点的 NavMesh 可达性用例继续通过。
+
+Windows 冒烟扩展了实际中层平台攀爬/翻越、探索宝箱、台地信标、滑翔、双石解谜、珍稀回声匣、JSON 往返和安全传送。流程仍使用测试传送和直接击败敌人缩短时间，不代表真人自然走完所有路线；攀爬和滑翔用实际 `PlayerTraversal.Simulate` 执行。截图查看确认攀爬画面、台地、滑翔风帆、体力条、中文区域名及探索地图/传送按钮存在。截图 01～09 位于上述输出目录，未纳入 Git。
+
+环境：Intel Core Ultra 9 285H、Intel Arc 140T GPU、1920×1080、URP PC、60 FPS 上限。高台位置 300 帧离屏渲染采样：平均 16.794 ms，P95 16.671 ms，Unity 已分配内存 168.93 MB，Gen 0 GC 1 次。未观察到此短时场景的明显性能退化；这不是整段正常游玩的 CPU/GPU Profiler 验收，不能据此声称全地图稳定 60 FPS。
+
+验证中发现并修复：翻越落点过于贴边；CharacterController 恢复位置后的历史接地标志阻止滑翔。两者都有回归测试。首次沙箱内执行 `game/Tools/Verify.ps1` 停在 Unity licensing 初始化，属环境问题，沙箱外重试成功；另修正脚本只等待 Editor 主进程，避免等待仍存活的 Hub 子进程。最终全部测试和构建通过。
+
+仍需人工验收：镜头舒适度、坡面/台阶的连续手感、复杂网格转角、完整探索节奏与视线引导。当前地图缩略尺度下有标签密集情况，可放大查看；正式标签避让、正式美术、IK 和高质量动画不在本次占位实现中。
+
+---
+
 日期：2026-09-04。交付为可运行的 Windows 单人冒险占位原型，不等同于完成正式美术、真人体验或整段性能验收。
 
 ## 运行与版本

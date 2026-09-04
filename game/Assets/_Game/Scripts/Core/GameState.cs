@@ -12,13 +12,15 @@ namespace WanderingCity
     }
     [Serializable] public sealed class GameState
     {
-        public int version = 1, hp = 100, weaponLevel = 1, selectedSlot;
+        public int version = 2, hp = 100, weaponLevel = 1, selectedSlot;
         public float x, y = 1, z, yaw;
         public bool craftedPotion, placedBuilding;
         public List<ItemStack> inventory = new List<ItemStack> { new ItemStack("potion", 2) };
         public List<string> claimed = new List<string>(), defeated = new List<string>(), visited = new List<string>();
         public List<string> hotbar = new List<string> { "potion", "floor", "wall", "roof" };
         public List<BuildingState> buildings = new List<BuildingState>();
+        public List<string> discoveredPOIIds = new List<string>(), activatedTeleportIds = new List<string>(), discoveredRegionIds = new List<string>();
+        public List<string> openedTreasureIds = new List<string>(), completedPuzzleIds = new List<string>();
         public int Count(string id) => inventory.Where(s => s.id == id).Sum(s => s.count);
     }
     public sealed class Recipe

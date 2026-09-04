@@ -15,6 +15,7 @@ namespace WanderingCity
         public SaveStore Saves { get; private set; }
         public PlayerMotor Player { get; private set; }
         public WorldBuilder World { get; private set; }
+        public ExplorationWorld Exploration { get; private set; }
         public GameHud Hud { get; private set; }
         public bool Paused { get; private set; }
         public bool Started { get; private set; }
@@ -40,13 +41,14 @@ namespace WanderingCity
             note = AudioClip.Create("Original synthesized chime", 4410, 1, 44100, false);
             var samples = new float[4410]; for (int i = 0; i < samples.Length; i++) samples[i] = Mathf.Sin(i * .065f) * .15f * (1f - i / 4410f); note.SetData(samples, 0);
             World = gameObject.AddComponent<WorldBuilder>(); World.Create(this);
+            Exploration = GetComponent<ExplorationWorld>();
             Player = World.CreatePlayer(this); World.Restore(State);
             Hud = gameObject.AddComponent<GameHud>(); Hud.Create(this);
             SetMenu(true, "title");
         }
         public void Begin(bool fresh)
         {
-            if (fresh) { try { Saves.Archive(); } catch (Exception e) { Notify("无法归档旧存档：" + e.Message); return; } State = new GameState(); World.Restore(State); }
+            if (fresh) { try { Saves.Archive(); } catch (Exception e) { Notify("无法归档旧存档：" + e.Message); return; } State = new GameState(); World.Restore(State); Exploration.Restore(); }
             if (Saves.Blocked) { Notify(Notice); return; }
             Started = true; Player.RestorePosition(); SetMenu(false); Notify(fresh ? "WASD 移动 · 鼠标转动镜头 · E 交互 · Esc 查看帮助" : Notice);
         }
@@ -78,6 +80,7 @@ namespace WanderingCity
         public void Craft(string kind) => Result(Rules.Craft(State, kind, AtWorkbench), "制作完成 / " + GameHud.ItemName(kind), "材料不足、背包已满或不在工作台附近");
         public void Upgrade() => Result(Rules.Upgrade(State, AtWorkbench), "长剑已升级 · 攻击力 26 → 42", "需要星核 ×1、矿石 ×5；仅可在工作台升级一次");
         public void SetMenu(bool paused, string page = "pause") { Paused = paused; Time.timeScale = paused ? 0 : 1; Cursor.lockState = paused ? CursorLockMode.None : CursorLockMode.Locked; Cursor.visible = paused; if (Hud != null) Hud.Page = paused ? page : ""; }
+        public void ExitBuilding() { Building = false; World.HidePreview(); }
         public bool Save(bool announce = false)
         {
             if (!Started || Saves.Blocked) return false;

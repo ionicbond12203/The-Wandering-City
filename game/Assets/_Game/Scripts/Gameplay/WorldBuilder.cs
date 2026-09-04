@@ -14,6 +14,8 @@ namespace WanderingCity
         public readonly List<EnemyAgent> Enemies = new List<EnemyAgent>();
         readonly List<GameObject> buildings = new List<GameObject>();
         readonly Dictionary<Color, Material> materials = new Dictionary<Color, Material>();
+        readonly Dictionary<Vector2Int, List<WorldInteractable>> interactionCells = new Dictionary<Vector2Int, List<WorldInteractable>>();
+        int indexedInteractions = -1;
         GameSession session; Transform terrainRoot, worldRoot; GameObject preview;
         Material previewMaterial;
         public void Create(GameSession owner)
@@ -54,6 +56,7 @@ namespace WanderingCity
             Chest("chest-quarry", new Vector3(81, .7f, 86), new Dictionary<string, int> { ["ore"] = 4, ["stone"] = 10 }, "矿场宝箱 / 矿石 ×4、石材 ×10");
             Chest("chest-hidden", new Vector3(-5, .7f, 103), new Dictionary<string, int> { ["potion"] = 3 }, "溪畔秘藏 / 药剂 ×3");
             Chest("camp-reward", new Vector3(20, .7f, 141), new Dictionary<string, int> { ["core"] = 1, ["ore"] = 5 }, "星核宝箱 / 星核 ×1、矿石 ×5");
+            gameObject.AddComponent<ExplorationWorld>().Create(session, this, terrainRoot, worldRoot);
             var surface = terrainRoot.gameObject.AddComponent<NavMeshSurface>(); surface.collectObjects = CollectObjects.Children; surface.useGeometry = NavMeshCollectGeometry.PhysicsColliders; surface.BuildNavMesh();
             for (int i = 0; i < 5; i++) Enemy("enemy-camp-" + i, new Vector3(11 + i % 3 * 8, .1f, 122 + i / 3 * 11));
             Vector3[] wild = { new Vector3(-35, .1f, 46), new Vector3(-63, .1f, 82), new Vector3(47, .1f, 48), new Vector3(76, .1f, 79), new Vector3(-3, .1f, 104) };
@@ -82,6 +85,7 @@ namespace WanderingCity
             var go = new GameObject("Traveler"); go.layer = 8; go.transform.position = Vector3.up;
             var cc = go.AddComponent<CharacterController>(); cc.height = 1.8f; cc.center = Vector3.up * .9f; cc.radius = .35f; cc.stepOffset = .35f; cc.slopeLimit = 48;
             var player = go.AddComponent<PlayerMotor>(); player.Session = owner; player.Controller = cc;
+            player.Traversal = go.AddComponent<PlayerTraversal>(); player.Traversal.Initialize(player);
             var visual = new GameObject("Traveler visual").transform; visual.SetParent(go.transform, false); player.Visual = visual;
             Shape("Coat", PrimitiveType.Capsule, go.transform.position + Vector3.up * .9f, new Vector3(.65f, .65f, .5f), new Color(.18f, .38f, .43f), visual, false);
             Shape("Head", PrimitiveType.Sphere, go.transform.position + Vector3.up * 1.65f, Vector3.one * .43f, new Color(.83f, .68f, .48f), visual, false);
@@ -89,6 +93,8 @@ namespace WanderingCity
             var blade = new GameObject("Sword pivot").transform; blade.SetParent(visual, false); blade.localPosition = new Vector3(.45f, 1, .1f); player.Blade = blade;
             Shape("Traveler sword", PrimitiveType.Cube, blade.position + new Vector3(0, 0, .65f), new Vector3(.09f, .15f, 1.4f), new Color(.86f, .9f, .84f), blade, false);
             player.Animator = visual.gameObject.AddComponent<Animator>(); player.Animator.runtimeAnimatorController = Resources.Load<RuntimeAnimatorController>("Traveler"); player.Animator.applyRootMotion = false;
+            player.GlideSail = Shape("Traveler / folding wind sail", PrimitiveType.Cube, go.transform.position + new Vector3(0, 2, -.4f), new Vector3(3.2f, .08f, 1.2f), new Color(.31f, .72f, .7f), visual, false).transform;
+            player.GlideSail.gameObject.SetActive(false);
             var cameraObject = new GameObject("Main Camera"); cameraObject.tag = "MainCamera"; var cam = cameraObject.AddComponent<Camera>(); cam.fieldOfView = 58; cam.farClipPlane = 320; cam.backgroundColor = RenderSettings.fogColor; cameraObject.AddComponent<AudioListener>();
             var orbit = cameraObject.AddComponent<OrbitCamera>(); orbit.Target = go.transform; orbit.Session = owner;
             return player;
@@ -114,7 +120,33 @@ namespace WanderingCity
         }
         public void RefreshRewards() { foreach (var item in Interactions) if (!item.Id.StartsWith("drop-") || session.State.defeated.Contains(item.Id.Substring(5))) item.gameObject.SetActive(item.Available); }
         public void ResetEnemies() { foreach (var enemy in Enemies) if (enemy.gameObject.activeSelf) enemy.ResetEncounter(); }
-        public WorldInteractable FindInteraction(Vector3 origin) => Interactions.Where(i => i.gameObject.activeSelf && i.Available && Vector3.Distance(i.transform.position, origin) < 3.6f && CombatVisibility.Clear(origin, i.transform.position)).OrderBy(i => Vector3.SqrMagnitude(i.transform.position - origin)).FirstOrDefault();
+        public WorldInteractable FindInteraction(Vector3 origin)
+        {
+            if (indexedInteractions != Interactions.Count)
+            {
+                interactionCells.Clear();
+                foreach (var item in Interactions)
+                {
+                    var key = InteractionCell(item.transform.position);
+                    if (!interactionCells.TryGetValue(key, out var cell)) { cell = new List<WorldInteractable>(); interactionCells.Add(key, cell); }
+                    cell.Add(item);
+                }
+                indexedInteractions = Interactions.Count;
+            }
+            WorldInteractable nearest = null; float best = 3.6f * 3.6f;
+            var center = InteractionCell(origin);
+            for (int x = -1; x <= 1; x++) for (int z = -1; z <= 1; z++)
+            {
+                if (!interactionCells.TryGetValue(center + new Vector2Int(x, z), out var cell)) continue;
+                foreach (var item in cell)
+                {
+                    float distance = (item.transform.position - origin).sqrMagnitude;
+                    if (item.gameObject.activeSelf && item.Available && distance < best && CombatVisibility.Clear(origin, item.transform.position)) { best = distance; nearest = item; }
+                }
+            }
+            return nearest;
+        }
+        static Vector2Int InteractionCell(Vector3 p) => new Vector2Int(Mathf.FloorToInt(p.x / 8), Mathf.FloorToInt(p.z / 8));
         public static string Region(Vector3 p) => p.z > 111 ? "ruins" : p.x < -24 && p.z > 28 ? "forest" : p.x > 32 && p.z > 28 ? "quarry" : "camp";
         public static string RegionName(string id) => id == "forest" ? "风息树林" : id == "quarry" ? "旧日采石场" : id == "ruins" ? "沉眠营地" : "旅人据点";
         public static void Geometry(string kind, int x, int z, int rotation, out Vector3 center, out Vector3 size)

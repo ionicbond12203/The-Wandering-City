@@ -11,11 +11,13 @@ namespace WanderingCity
         public CharacterController Controller;
         public Transform Visual, Blade;
         public Animator Animator;
+        public PlayerTraversal Traversal;
+        public Transform GlideSail;
         public PlayerAction Action { get; private set; }
-        public bool CanAct => Action == PlayerAction.Move;
+        public bool CanAct => Action == PlayerAction.Move && (Traversal == null || !Traversal.BlocksCombat);
         public bool Invulnerable => Action == PlayerAction.Dodge && actionTime < Session.Balance.invulnerability;
         public float AttackAge => actionTime;
-        float vertical, actionTime, dodgeCooldown, deathTime;
+        float actionTime, dodgeCooldown, deathTime;
         Vector3 velocity, dodgeDirection;
         readonly HashSet<EnemyAgent> hit = new HashSet<EnemyAgent>();
         readonly Collider[] overlaps = new Collider[24];
@@ -24,7 +26,11 @@ namespace WanderingCity
             Controller.enabled = false; transform.SetPositionAndRotation(new Vector3(Session.State.x, Session.State.y, Session.State.z), Quaternion.Euler(0, Session.State.yaw, 0)); Controller.enabled = true;
             // A valid numeric position can still be inside a newly placed structure.
             if (Physics.CheckCapsule(transform.position + Vector3.up * .5f, transform.position + Vector3.up * 1.5f, .32f, 1 << 0, QueryTriggerInteraction.Ignore)) { Controller.enabled = false; transform.position = Vector3.up; Controller.enabled = true; }
-            Action = PlayerAction.Move; actionTime = vertical = dodgeCooldown = 0; velocity = Vector3.zero; hit.Clear();
+            Action = PlayerAction.Move; actionTime = dodgeCooldown = 0; velocity = Vector3.zero; hit.Clear();
+            if (Blade != null) Blade.localRotation = Quaternion.identity;
+            Traversal?.ResetMotion(true);
+            if (GlideSail != null) GlideSail.gameObject.SetActive(false);
+            if (Animator != null) { Animator.SetBool("Dead", false); Animator.SetInteger("Action", 0); }
         }
         void Update()
         {
@@ -48,16 +54,18 @@ namespace WanderingCity
             }
             if (Action == PlayerAction.Dodge && actionTime >= Session.Balance.dodgeDuration) Action = PlayerAction.Move;
             if (Action == PlayerAction.Hurt && actionTime >= .22f) Action = PlayerAction.Move;
-            float speed = kb.leftShiftKey.isPressed ? 8f : 4.8f;
-            Vector3 desired = direction * (CanAct ? speed : 1.4f);
-            velocity = Vector3.MoveTowards(velocity, desired, 35 * dt);
-            if (direction.sqrMagnitude > .1f && CanAct) transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(direction), 14 * dt);
-            if (Controller.isGrounded && vertical < 0) vertical = -2;
-            if (Controller.isGrounded && kb.spaceKey.wasPressedThisFrame && CanAct) vertical = 8;
-            vertical -= 24 * dt;
-            Controller.Move(((Action == PlayerAction.Dodge ? dodgeDirection * 14 : velocity) + Vector3.up * vertical) * dt);
-            Visual.localPosition = new Vector3(0, CanAct && input.sqrMagnitude > 0 ? Mathf.Sin(Time.time * speed * 2) * .045f : 0, 0);
+            Traversal.Simulate(dt, direction, input, kb.leftShiftKey.isPressed, kb.leftAltKey.isPressed, kb.spaceKey.wasPressedThisFrame, kb.cKey.wasPressedThisFrame, kb.gKey.wasPressedThisFrame, kb.xKey.wasPressedThisFrame, Action == PlayerAction.Dodge ? dodgeDirection * Session.Balance.dodgeSpeed : (Vector3?)null);
+            Visual.localPosition = new Vector3(0, CanAct && input.sqrMagnitude > 0 ? Mathf.Sin(Time.time * Traversal.Speed * 2) * .045f : 0, 0);
+            velocity = transform.forward * Traversal.Speed;
             if (Animator != null && Animator.runtimeAnimatorController != null) { Animator.SetFloat("Speed", velocity.magnitude); Animator.SetInteger("Action", (int)Action); }
+            if (Animator != null && Animator.runtimeAnimatorController != null)
+            {
+                Animator.SetFloat("VerticalVelocity", Traversal.VerticalVelocity); Animator.SetInteger("Traversal", (int)Traversal.State);
+                Animator.SetBool("Grounded", Traversal.Grounded); Animator.SetBool("Climbing", Traversal.State == TraversalState.Climb);
+                Animator.SetBool("Gliding", Traversal.State == TraversalState.Glide); Animator.SetBool("Attack", Action == PlayerAction.Attack);
+                Animator.SetBool("Dodge", Action == PlayerAction.Dodge); Animator.SetBool("Dead", Action == PlayerAction.Dead);
+            }
+            if (GlideSail != null) GlideSail.gameObject.SetActive(Traversal.State == TraversalState.Glide);
             if (transform.position.y < -8) Session.Respawn();
         }
         public bool StartAttack()
@@ -82,6 +90,9 @@ namespace WanderingCity
             if (amount <= 0 || Action == PlayerAction.Dead || Invulnerable || Session.State.hp <= 0) return false;
             Session.State.hp = Mathf.Max(0, Session.State.hp - amount); Session.Hud.Flash(); Session.Tone(.45f);
             Action = Session.State.hp == 0 ? PlayerAction.Dead : PlayerAction.Hurt; actionTime = 0; Blade.localRotation = Quaternion.identity;
+            Traversal?.Interrupt();
+            if (GlideSail != null) GlideSail.gameObject.SetActive(false);
+            if (Animator != null) { Animator.SetBool("Dead", Action == PlayerAction.Dead); Animator.SetInteger("Action", (int)Action); }
             if (Action == PlayerAction.Dead) { deathTime = Time.time + 1.5f; Session.Notify("旅途未完 · 正在返回据点……"); }
             return true;
         }

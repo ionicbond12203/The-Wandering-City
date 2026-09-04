@@ -59,6 +59,34 @@ namespace WanderingCity
             MoveTo(game, new Vector3(-6, .5f, -6)); Camera.main.GetComponent<OrbitCamera>().Yaw = 0;
             for (int i = 0; i < 15; i++) yield return null;
             yield return Capture("05-home.png");
+            // Exercise the new loop through its real motor/interaction APIs, without claiming a manual playthrough.
+            game.Player.enabled = false;
+            MoveTo(game, new Vector3(53, .1f, -17.6f));
+            game.Player.transform.rotation = Quaternion.identity;
+            var traversal = game.Player.Traversal;
+            Require(traversal.TryClimb(), "enter authored shelf climb");
+            for (int i = 0; i < 65; i++) { traversal.Simulate(.02f, Vector3.zero, Vector2.up, false, false, false, false, false, false); yield return null; }
+            yield return Capture("06-climb.png");
+            for (int i = 0; i < 120; i++) { traversal.Simulate(.02f, Vector3.zero, Vector2.up, false, false, false, false, false, false); yield return null; }
+            Require(game.Player.transform.position.y > 5.9f && !traversal.BlocksCombat, "reach shelf ledge");
+            MoveTo(game, new Vector3(51, 6.1f, -9)); game.World.Interactions.Find(n => n.Id == "shelf-cache").Interact(); Require(game.State.openedTreasureIds.Contains("shelf-cache"), "exploration treasure");
+            MoveTo(game, new Vector3(75, 14.1f, 8)); game.World.Interactions.Find(n => n.Id == "mesa-beacon").Interact(); Require(game.State.activatedTeleportIds.Contains("mesa-beacon"), "activate mesa beacon");
+            for (int i = 0; i < 15; i++) yield return null;
+            yield return Capture("07-mesa.png");
+            MoveTo(game, new Vector3(81, 14, 21)); Require(traversal.TryGlide(), "deploy wind sail");
+            game.Player.GlideSail.gameObject.SetActive(true);
+            for (int i = 0; i < 45; i++) { traversal.Simulate(.02f, Vector3.forward, Vector2.up, false, false, false, false, false, false); yield return null; }
+            yield return Capture("08-glide.png");
+            game.Player.GlideSail.gameObject.SetActive(false);
+            MoveTo(game, new Vector3(81, .1f, 28)); game.World.Interactions.Find(n => n.Id == "echo-west").Interact();
+            MoveTo(game, new Vector3(81, .1f, 32)); game.World.Interactions.Find(n => n.Id == "echo-east").Interact();
+            MoveTo(game, new Vector3(81, .1f, 34)); game.World.Interactions.Find(n => n.Id == "canyon-cache").Interact();
+            Require(game.State.completedPuzzleIds.Contains("echo-puzzle") && game.State.openedTreasureIds.Contains("canyon-cache"), "puzzle reward");
+            Require(game.Save(), "exploration save"); Require(game.Saves.Load(out var explorationSave, out _), "exploration reload");
+            Require(explorationSave.activatedTeleportIds.Contains("mesa-beacon") && explorationSave.openedTreasureIds.Count == 2, "persistent exploration");
+            game.SetMenu(true, "map"); for (int i = 0; i < 5; i++) yield return null; yield return Capture("09-exploration-map.png");
+            game.SetMenu(false); Require(game.Exploration.Teleport("mesa-beacon"), "teleport to safe spawn");
+            game.Player.enabled = true;
             var frameTimes = new List<float>(); long gcBefore = GC.CollectionCount(0); double start = Time.realtimeSinceStartupAsDouble;
             for (int i = 0; i < 300; i++) { RenderFrame(); yield return null; frameTimes.Add(Time.unscaledDeltaTime * 1000); }
             frameTimes.Sort();

@@ -22,3 +22,62 @@ MonoBehaviour:
   dodgeDuration: 0.42
   invulnerability: 0.28
   dodgeCooldown: 0.9
+  walkSpeed: 2.4
+  runSpeed: 4.8
+  sprintSpeed: 8
+  dodgeSpeed: 14
+  acceleration: 30
+  deceleration: 38
+  airControl: 0.4
+  turnSpeed: 14
+  gravity: 24
+  jumpHeight: 1.6
+  terminalSpeed: 35
+  groundSnap: 4
+  coyoteTime: 0.12
+  jumpBuffer: 0.15
+  slopeLimit: 48
+  stepHeight: 0.35
+  maxMoveStep: 0.18
+  maxSimulationStep: 0.025
+  maxStamina: 100
+  staminaRecovery: 25
+  staminaDelay: 1.1
+  sprintDrain: 16
+  climbUpDrain: 15
+  climbSideDrain: 10
+  climbDownDrain: 5
+  climbIdleDrain: 3
+  glideDrain: 7
+  staminaRestart: 15
+  climbMask:
+    serializedVersion: 2
+    m_Bits: 1
+  solidMask:
+    serializedVersion: 2
+    m_Bits: 1
+  climbSpeed: 2.6
+  climbProbe: 0.95
+  wallGap: 0.06
+  climbMinHeight: 2
+  maxWallNormalY: 0.25
+  cornerAngle: 65
+  detachDelay: 0.45
+  ledgeReach: 1.6
+  ledgeForward: 0.95
+  ledgeSpeed: 3.5
+  ledgeTimeout: 2
+  glideGravityMultiplier: 0.15
+  glideSpeed: 7
+  glideAcceleration: 8
+  glideDescent: 2.5
+  glideMinHeight: 1.4
+  cameraFov: 58
+  sprintFov: 64
+  cameraBlend: 5
+  glideCameraDistance: 2
+  climbCameraHeight: 0.3
+  cameraRadius: 0.24
+  commonTreasureOre: 2
+  rareTreasureOre: 6
+  rareTreasurePotions: 2
