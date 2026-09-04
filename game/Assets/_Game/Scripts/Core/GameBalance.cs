@@ -24,7 +24,7 @@ namespace WanderingCity
         [Header("Glide")]
         public float glideGravityMultiplier = .15f, glideSpeed = 7, glideAcceleration = 8, glideDescent = 2.5f, glideMinHeight = 1.4f;
         [Header("Camera")]
-        public float cameraFov = 58, sprintFov = 64, cameraBlend = 5, glideCameraDistance = 2, climbCameraHeight = .3f, cameraRadius = .24f;
+        public float cameraDistance = 4.6f, cameraFocusHeight = 1.35f, cameraFov = 54, sprintFov = 60, cameraBlend = 5, glideCameraDistance = 1.8f, climbCameraHeight = .3f, cameraRadius = .24f;
         [Header("Exploration rewards")]
         public int commonTreasureOre = 2, rareTreasureOre = 6, rareTreasurePotions = 2;
     }

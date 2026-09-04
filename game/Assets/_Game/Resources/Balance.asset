@@ -72,6 +72,8 @@ MonoBehaviour:
   glideAcceleration: 8
   glideDescent: 2.5
   glideMinHeight: 1.4
+  cameraDistance: 4.6
+  cameraFocusHeight: 1.35
   cameraFov: 58
   sprintFov: 64
   cameraBlend: 5

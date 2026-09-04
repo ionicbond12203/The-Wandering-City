@@ -16,7 +16,9 @@ namespace WanderingCity
         Canvas canvas; RectTransform root, menu;
         CanvasGroup gameplayGroup;
         TMP_FontAsset font;
-        TMP_Text status, objective, prompt, notice, hotbar, location, menuInfo;
+        TMP_Text status, objective, prompt, notice, hotbar, location, menuInfo, tutorialHint;
+        CanvasGroup tutorialGroup;
+        float tutorialTimer = 8f, tutorialAlpha = 1f;
         Image health, damage, stamina;
         string renderedPage;
         float flash;
@@ -39,16 +41,30 @@ namespace WanderingCity
             location = Label(root, "旅人据点", 64, 84, 355, 46, 30, ivory);
             Box(root, "Objective panel", 40, 160, 390, 158, new Color(.08f, .16f, .17f, .84f));
             objective = Label(root, "", 62, 180, 345, 122, 22, ivory);
-            Label(root, "M 地图   Tab 背包   Esc 暂停", 1440, 45, 440, 36, 20, ivory, TextAlignmentOptions.Right);
+            
+            // MiniMap placeholder in top-right
+            Box(root, "MiniMap border", 1730, 36, 150, 150, new Color(.08f, .16f, .17f, .90f));
+            Box(root, "MiniMap center", 1734, 40, 142, 142, new Color(.11f, .18f, .19f, .96f));
+            Label(root, "MINIMAP", 1730, 48, 150, 22, 13, gold, TextAlignmentOptions.Center);
+            Label(root, "◇", 1730, 96, 150, 28, 22, ivory, TextAlignmentOptions.Center);
+            Label(root, "M 全图", 1730, 152, 150, 22, 13, gold, TextAlignmentOptions.Center);
+            Label(root, "Tab 背包   Esc 暂停", 1430, 45, 280, 36, 19, ivory, TextAlignmentOptions.Right);
+
             Label(root, "N  /  北方遗迹", 770, 35, 380, 30, 20, gold, TextAlignmentOptions.Center);
             status = Label(root, "", 60, 924, 490, 45, 22, ivory);
             Box(root, "HP track", 60, 975, 355, 10, new Color(.12f, .22f, .22f, .9f));
             health = Box(root, "HP", 60, 975, 355, 10, new Color(.51f, .8f, .6f));
             Box(root, "Stamina track", 60, 1000, 355, 8, new Color(.12f, .22f, .22f));
             stamina = Box(root, "Stamina", 60, 1000, 355, 8, new Color(.35f, .79f, .87f));
-            Label(root, "体力 / Shift 冲刺 · C 攀爬 · G 滑翔 · X 松开", 60, 1017, 570, 34, 18, ivory);
+            Label(root, "体力", 60, 1017, 100, 28, 16, ivory);
             hotbar = Label(root, "", 630, 975, 690, 55, 23, ivory, TextAlignmentOptions.Center);
-            Label(root, "WASD 移动  /  Shift 奔跑  /  Space 跳跃\n左键 攻击  /  右键 闪避  /  Q 使用快捷物品", 1380, 948, 480, 75, 19, ivory, TextAlignmentOptions.Right);
+
+            // Contextual tutorial hint with auto-fade
+            var tutGo = new GameObject("Contextual Tutorial", typeof(RectTransform), typeof(CanvasGroup));
+            var tutRect = Rect(tutGo, root, 1360, 965, 500, 60);
+            tutorialGroup = tutGo.GetComponent<CanvasGroup>();
+            tutorialHint = Label(tutRect, "WASD 移动 · Space 跳跃 · 左键 攻击", 0, 0, 500, 50, 18, ivory, TextAlignmentOptions.Right);
+
             prompt = Label(root, "", 505, 800, 910, 110, 25, ivory, TextAlignmentOptions.Center);
             notice = Label(root, "", 465, 170, 990, 90, 25, gold, TextAlignmentOptions.Center);
             Label(root, "·", 948, 520, 24, 30, 30, ivory, TextAlignmentOptions.Center);
@@ -71,6 +87,28 @@ namespace WanderingCity
             hotbar.text = string.Join("     ", s.hotbar.Select((id, i) => (s.selectedSlot == i ? "<color=#E4BA68>" : "") + (i + 1) + " " + ItemName(id) + " ×" + s.Count(id) + (s.selectedSlot == i ? "</color>" : "")));
             prompt.text = session.Building ? "建造 / " + ItemName(session.BuildKind) + " ×" + s.Count(session.BuildKind) + "\n1 地板   2 墙体   3 屋顶   R 旋转   左键放置   X 拆除   B 退出" : session.Target != null && !session.Paused ? "[ E ]  " + session.Target.Label : "";
             notice.text = Time.unscaledTime < session.NoticeUntil ? session.Notice : "";
+            if (session.Started && !session.Paused && tutorialHint != null)
+            {
+                var trav = session.Player != null ? session.Player.Traversal : null;
+                if (trav != null && trav.State == TraversalState.Climb)
+                {
+                    tutorialHint.text = "悬崖攀爬 · WASD 移动 · X 松开";
+                    tutorialTimer = 3.5f;
+                }
+                else if (trav != null && trav.State == TraversalState.Glide)
+                {
+                    tutorialHint.text = "原野滑翔 · WASD 导向 · G 收翼";
+                    tutorialTimer = 3.5f;
+                }
+                else if (tutorialTimer > 0f)
+                {
+                    tutorialTimer -= Time.unscaledDeltaTime;
+                }
+
+                float targetAlpha = tutorialTimer > 0f ? 1f : 0f;
+                tutorialAlpha = Mathf.MoveTowards(tutorialAlpha, targetAlpha, Time.unscaledDeltaTime * 1.5f);
+                if (tutorialGroup != null) tutorialGroup.alpha = tutorialAlpha;
+            }
             foreach (var row in enemyLabels)
             {
                 bool visible = !session.Paused && row.enemy.gameObject.activeSelf && Vector3.Distance(session.Player.transform.position, row.enemy.transform.position) < 20;

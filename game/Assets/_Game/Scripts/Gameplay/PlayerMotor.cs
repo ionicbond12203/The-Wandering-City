@@ -13,6 +13,7 @@ namespace WanderingCity
         public Animator Animator;
         public PlayerTraversal Traversal;
         public Transform GlideSail;
+        public CharacterVisualAdapter VisualAdapter;
         public PlayerAction Action { get; private set; }
         public bool CanAct => Action == PlayerAction.Move && (Traversal == null || !Traversal.BlocksCombat);
         public bool Invulnerable => Action == PlayerAction.Dodge && actionTime < Session.Balance.invulnerability;

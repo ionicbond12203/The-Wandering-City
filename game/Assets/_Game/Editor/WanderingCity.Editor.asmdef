@@ -1,5 +1,12 @@
 {
   "name": "WanderingCity.Editor",
-  "references": ["WanderingCity"],
-  "includePlatforms": ["Editor"]
+  "references": [
+    "WanderingCity",
+    "Unity.AI.Navigation",
+    "Unity.RenderPipelines.Universal.Runtime",
+    "Unity.RenderPipelines.Core.Runtime"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ]
 }
