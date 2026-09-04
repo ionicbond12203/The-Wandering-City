@@ -37,12 +37,12 @@ namespace WanderingCity
             h = Pad(h,x,z,51,-8,16,5);
             h = Pad(h,x,z,78,8,17,5);
             h = Pad(h,x,z,81,32,14,5);
-            return Mathf.Clamp(h, .4f, 148);
+            return Mathf.Clamp(ExpansionCatalog.ShapeTerrain(x,z,h), .4f, 148);
         }
         public static float RoadDistance(Vector2 p)
         {
             Vector2 a = new Vector2(0,4), b = new Vector2(-46,62), c = new Vector2(61,57), d = new Vector2(20,128);
-            return Mathf.Min(Mathf.Min(Segment(p,a,b),Segment(p,a,c)), Mathf.Min(Segment(p,b,d),Segment(p,c,d)));
+            return Mathf.Min(ExpansionCatalog.RoadDistance(p), Mathf.Min(Mathf.Min(Segment(p,a,b),Segment(p,a,c)), Mathf.Min(Segment(p,b,d),Segment(p,c,d))));
         }
         static float Segment(Vector2 p, Vector2 a, Vector2 b) => Vector2.Distance(p, a + Mathf.Clamp01(Vector2.Dot(p-a,b-a) / (b-a).sqrMagnitude) * (b-a));
     }

@@ -107,6 +107,12 @@ namespace WanderingCity
     }
     public static class WorldCatalog
     {
+        static WorldCatalog()
+        {
+            EnemyIds.UnionWith(ExpansionCatalog.EnemyIds);
+            RewardIds.UnionWith(ExpansionCatalog.ResourceIds);
+            RewardIds.UnionWith(ExpansionCatalog.EnemyIds.Select(id=>"drop-"+id));
+        }
         public static readonly string[] CampEnemies = Enumerable.Range(0, 5).Select(i => "enemy-camp-" + i).ToArray();
         public static readonly HashSet<string> EnemyIds = new HashSet<string>(CampEnemies.Concat(Enumerable.Range(0, 5).Select(i => "enemy-wild-" + i)));
         public static readonly HashSet<string> RewardIds = new HashSet<string>(Enumerable.Range(0, 28).Select(i => "wood-" + i).Concat(Enumerable.Range(0, 20).Select(i => "stone-" + i)).Concat(Enumerable.Range(0, 12).Select(i => "ore-" + i)).Concat(EnemyIds.Select(id => "drop-" + id)).Concat(new[] { "camp-reward", "chest-forest", "chest-quarry", "chest-hidden" }));

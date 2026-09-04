@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Collections.Generic;
 
 namespace WanderingCity
@@ -7,6 +8,14 @@ namespace WanderingCity
     public enum TreasureTier { Common, Rare }
     public static class ExplorationCatalog
     {
+        static ExplorationCatalog()
+        {
+            PoiIds.UnionWith(ExpansionCatalog.PoiIds);
+            TeleportIds.UnionWith(ExpansionCatalog.Regions.Select(r=>r.Key("beacon")));
+            RegionIds.UnionWith(ExpansionCatalog.Regions.Select(r=>r.Id));
+            TreasureIds.UnionWith(ExpansionCatalog.Regions.SelectMany(r=>new[]{"cache-a","cache-b","puzzle-cache","elite-cache"}.Select(r.Key)));
+            PuzzleIds.UnionWith(ExpansionCatalog.Regions.Select(r=>r.Key("puzzle")));
+        }
         public static readonly HashSet<string> PoiIds = new HashSet<string> { "base-beacon", "mesa-beacon", "wind-spire", "shelf-cache", "canyon-cache", "echo-puzzle", "north-camp", "ore-garden", "canyon-secret" };
         public static readonly HashSet<string> TeleportIds = new HashSet<string> { "base-beacon", "mesa-beacon" };
         public static readonly HashSet<string> RegionIds = new HashSet<string> { "wind-meadow", "echo-mesa", "split-canyon" };
@@ -29,7 +38,7 @@ namespace WanderingCity
         public static bool CanTeleport(GameState state, string id) => state.hp > 0 && ExplorationCatalog.TeleportIds.Contains(id) && state.activatedTeleportIds.Contains(id);
         public static bool OpenTreasure(GameState state, string id, IDictionary<string, int> reward)
         {
-            if (!ExplorationCatalog.TreasureIds.Contains(id) || state.hp <= 0 || state.openedTreasureIds.Contains(id) || (id == "canyon-cache" && !state.completedPuzzleIds.Contains("echo-puzzle"))) return false;
+            if (!ExplorationCatalog.TreasureIds.Contains(id) || state.hp <= 0 || state.openedTreasureIds.Contains(id) || !ExpansionCatalog.RewardUnlocked(state,id)) return false;
             if (!Rules.Transact(state, reward)) return false;
             state.openedTreasureIds.Add(id); Discover(state, id); return true;
         }

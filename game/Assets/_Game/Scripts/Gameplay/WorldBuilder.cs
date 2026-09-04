@@ -203,12 +203,8 @@ namespace WanderingCity
 
             gameObject.AddComponent<ExplorationWorld>().Create(session, this, terrainRoot, worldRoot);
 
-            var surface = terrainRoot.gameObject.AddComponent<NavMeshSurface>();
-            surface.collectObjects = CollectObjects.Volume;
-            surface.center = new Vector3(0, 40, 70);
-            surface.size = new Vector3(230, 110, 235);
-            surface.useGeometry = NavMeshCollectGeometry.PhysicsColliders;
-            surface.BuildNavMesh();
+            var expanded = gameObject.AddComponent<ExpandedWorld>(); expanded.Create(session, this, terrainRoot, worldRoot);
+            gameObject.AddComponent<PlayableNavigation>().Build();
 
             for (int i = 0; i < 5; i++)
             {
@@ -223,6 +219,7 @@ namespace WanderingCity
                 p.y = GroundY(p.x, p.z, 0) + .1f;
                 Enemy("enemy-wild-" + i, p);
             }
+            expanded.SpawnEnemies();
         }
 
         public GameObject Shape(string name, PrimitiveType type, Vector3 position, Vector3 scale, Color color, Transform parent = null, bool collision = true)
@@ -293,7 +290,7 @@ namespace WanderingCity
             return item;
         }
 
-        void Resource(string id, string name, Vector3 p, string kind, int count, Color color)
+        public void Resource(string id, string name, Vector3 p, string kind, int count, Color color)
         {
             var item = Interaction(id, name, p, new Dictionary<string, int> { [kind] = count });
             if(DevelopmentVisualMode.Enabled)
@@ -353,7 +350,7 @@ namespace WanderingCity
             return player;
         }
 
-        void Enemy(string id, Vector3 p)
+        public EnemyAgent Enemy(string id, Vector3 p, bool elite = false)
         {
             if (NavMesh.SamplePosition(p, out var nav, 5, NavMesh.AllAreas)) p = nav.position;
             var go = new GameObject(id);
@@ -378,8 +375,10 @@ namespace WanderingCity
             Shape("Amber eye", PrimitiveType.Cube, p + new Vector3(0, 1.6f, .36f), new Vector3(.5f, .1f, .1f), new Color(1, .7f, .25f), go.transform, false);
             e.Telegraph = Shape("Attack warning", PrimitiveType.Cylinder, p + Vector3.up * .08f, new Vector3(4.5f, .025f, 4.5f), new Color(.85f, .3f, .15f), go.transform, false).transform;
             e.Telegraph.gameObject.SetActive(false);
+            e.Elite = elite;
             e.Initialize();
             Enemies.Add(e);
+            return e;
         }
 
         public void SpawnDrop(string id, Vector3 p)

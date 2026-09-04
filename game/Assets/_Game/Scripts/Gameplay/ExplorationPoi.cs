@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Linq;
 
 namespace WanderingCity
 {
@@ -6,7 +7,7 @@ namespace WanderingCity
     {
         public string Id, DisplayName; public PoiType Type; public float Radius; public Vector3 SpawnPoint;
         public GameSession Session; public GameObject RewardVisual;
-        public bool Completed => Type == PoiType.TeleportPoint ? Session.State.activatedTeleportIds.Contains(Id) : Type == PoiType.Treasure ? Session.State.openedTreasureIds.Contains(Id) : Type == PoiType.Puzzle ? Session.State.completedPuzzleIds.Contains(Id) : Type == PoiType.EnemyCamp && Session.State.defeated.Count >= 5 && WorldCatalog.CampEnemies.Length == Session.State.defeated.FindAll(id => id.StartsWith("enemy-camp-")).Count;
+        public bool Completed => Type == PoiType.TeleportPoint ? Session.State.activatedTeleportIds.Contains(Id) : Type == PoiType.Treasure ? Session.State.openedTreasureIds.Contains(Id) : Type == PoiType.Puzzle ? Session.State.completedPuzzleIds.Contains(Id) : Type == PoiType.EnemyCamp && ExpansionCatalog.EnemiesFor(Id).Length > 0 && ExpansionCatalog.EnemiesFor(Id).All(Session.State.defeated.Contains);
         public bool Discover()
         {
             if (!Session.Started || Session.State.hp <= 0 || !ExplorationRules.Discover(Session.State, Id)) return false;

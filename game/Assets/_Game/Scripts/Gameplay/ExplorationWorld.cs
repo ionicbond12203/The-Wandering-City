@@ -81,7 +81,7 @@ namespace WanderingCity
             var go = world.Shape(name, PrimitiveType.Cube, center - Vector3.up * .15f, new Vector3(Mathf.Sqrt(run * run + rise * rise), .3f, width), new Color(.54f, .56f, .43f), geometry);
             go.transform.rotation = Quaternion.Euler(0, 0, Mathf.Atan2(rise, run) * Mathf.Rad2Deg);
         }
-        void Poi(string id, string name, PoiType type, Vector3 position, float radius, Vector3 spawn = default, TreasureTier tier = TreasureTier.Common)
+        public ExplorationPoi Poi(string id, string name, PoiType type, Vector3 position, float radius, Vector3 spawn = default, TreasureTier tier = TreasureTier.Common)
         {
             var go = new GameObject(id); go.transform.SetParent(root); go.transform.position = position;
             var poi = go.AddComponent<ExplorationPoi>(); poi.Id = id; poi.DisplayName = name; poi.Type = type; poi.Session = session; poi.SpawnPoint = spawn; poi.Radius = radius;
@@ -108,6 +108,7 @@ namespace WanderingCity
                     poi.RewardVisual = world.Shape(name, PrimitiveType.Cube, position, new Vector3(1.4f, .8f, 1), color, go.transform, false);
                 }
             }
+            return poi;
         }
         void AddNode(string id, Vector3 position)
         {
@@ -115,7 +116,7 @@ namespace WanderingCity
             var item = go.AddComponent<WorldInteractable>(); item.Id = id; item.Label = "共鸣石 / 点亮"; item.Session = session; item.Puzzle = Puzzle; world.Interactions.Add(item);
             world.Shape(id, PrimitiveType.Cylinder, position, new Vector3(.65f, .8f, .65f), new Color(.56f, .73f, .85f), go.transform, false);
         }
-        void Region(string id, string name, Vector3 center, Vector3 size)
+        public void Region(string id, string name, Vector3 center, Vector3 size)
         {
             var go = new GameObject(id); go.transform.SetParent(root); go.transform.position = center;
             var region = go.AddComponent<RegionDiscovery>(); region.Id = id; region.DisplayName = name; region.Session = session;
@@ -136,13 +137,15 @@ namespace WanderingCity
         }
         public void Restore()
         {
+            foreach(var puzzle in GetComponentsInChildren<PuzzleController>()) puzzle.ResetProgress();
             Puzzle?.ResetProgress();
+            GetComponent<ExpandedWorld>()?.ResetPuzzles();
             foreach (var point in Points.Values) point.Refresh();
         }
         public string RegionNameAt(Vector3 position)
         {
             for (int i = Regions.Count - 1; i >= 0; i--) if (Regions[i].Bounds.Contains(position)) return Regions[i].DisplayName;
-            return WorldBuilder.RegionName(WorldBuilder.Region(position));
+            return ExpansionCatalog.Playable(ExpansionCatalog.XZ(position)) ? WorldBuilder.RegionName(WorldBuilder.Region(position)) : "远景荒野 / 无探索路线";
         }
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         [ContextMenu("Reset exploration (keeps claimed treasures to prevent reward farming)")]

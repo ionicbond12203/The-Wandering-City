@@ -29,7 +29,7 @@ namespace WanderingCity.Tests
         void Teleport(Vector3 p) { game.State.x = p.x; game.State.y = p.y; game.State.z = p.z; game.Player.RestorePosition(); Physics.SyncTransforms(); }
         [UnityTest] public IEnumerator WorldContainsAllLandmarksAndPersistentObjects()
         {
-            yield return null; Assert.AreEqual(10, game.World.Enemies.Count); Assert.AreEqual(71, game.World.Interactions.Count); Assert.IsTrue(game.World.Enemies.All(e => e.Agent.isOnNavMesh)); Assert.IsNotNull(Camera.main); Assert.IsNotNull(game.Hud);
+            yield return null; Assert.AreEqual(35, game.World.Enemies.Count); Assert.AreEqual(151, game.World.Interactions.Count); Assert.IsTrue(game.World.Enemies.All(e => e.Agent.isOnNavMesh)); Assert.IsNotNull(Camera.main); Assert.IsNotNull(game.Hud);
             Assert.IsTrue(Camera.main.GetUniversalAdditionalCameraData().renderPostProcessing);
             Assert.GreaterOrEqual(Camera.main.farClipPlane,900);
             Assert.GreaterOrEqual(game.Player.transform.position.y,WorldBuilder.GroundY(0,0));
@@ -57,6 +57,64 @@ namespace WanderingCity.Tests
                 }
             }
             Assert.IsEmpty(missing, "Unreachable interactions: " + string.Join(", ", missing));
+        }
+        [UnityTest] public IEnumerator ExpandedBeaconsHaveConnectedSafeSpawnsAndPersist()
+        {
+            game.Player.enabled=false;
+            foreach(var r in ExpansionCatalog.Regions) {
+                Assert.IsTrue(game.Exploration.Points.TryGet(r.Key("beacon"),out var beacon));
+                Assert.IsTrue(NavMesh.SamplePosition(beacon.SpawnPoint,out var hit,2,NavMesh.AllAreas),r.Name);
+                var path=new NavMeshPath();Assert.IsTrue(NavMesh.CalculatePath(WorldBuilder.GroundPoint(0,0),hit.position,NavMesh.AllAreas,path));
+                Assert.AreEqual(NavMeshPathStatus.PathComplete,path.status,r.Name);
+                ExplorationRules.Activate(game.State,beacon.Id);Assert.IsTrue(game.Exploration.Teleport(beacon.Id),r.Name);
+                Assert.Less(Vector3.Distance(game.Player.transform.position,beacon.SpawnPoint),1);
+                Assert.IsTrue(game.Save());Assert.IsTrue(game.Saves.Load(out var restored,out _));
+                Assert.AreEqual(game.State.x,restored.x,.01f);Assert.AreEqual(game.State.z,restored.z,.01f);
+                Assert.Contains(beacon.Id,restored.activatedTeleportIds);
+            }
+            Assert.AreEqual(game.World.Interactions.Count,game.World.Interactions.Select(i=>i.Id).Distinct().Count());
+            yield return null;
+        }
+        [UnityTest] public IEnumerator ExpandedPuzzleAndEliteRewardsCannotBeDuplicatedAfterReload()
+        {
+            game.Player.enabled=false;var r=ExpansionCatalog.Regions[0];
+            var chest=game.World.Interactions.Find(i=>i.Id==r.Key("puzzle-cache"));
+            Assert.IsFalse(ExplorationRules.OpenTreasure(game.State,chest.Id,chest.Reward));
+            var puzzle=game.GetComponent<ExpandedWorld>().Puzzles[0];
+            foreach(string suffix in new[]{"note-low","note-high"}) {
+                var node=game.World.Interactions.Find(i=>i.Id==r.Key(suffix));
+                Teleport(node.transform.position+Vector3.back*2);node.Interact();
+            }
+            Assert.Contains(puzzle.Id,game.State.completedPuzzleIds);
+            Teleport(chest.transform.position+Vector3.back*2);chest.Interact();Assert.Contains(chest.Id,game.State.openedTreasureIds);
+            var eliteChest=game.World.Interactions.Find(i=>i.Id==r.Key("elite-cache"));
+            Assert.IsFalse(ExplorationRules.OpenTreasure(game.State,eliteChest.Id,eliteChest.Reward));
+            var elite=game.World.Enemies.Find(e=>e.Id==r.Key("warden"));Assert.Greater(elite.MaxHp,game.Balance.enemyHealth);elite.Damage(9999);
+            Teleport(eliteChest.transform.position+Vector3.back*2);eliteChest.Interact();Assert.Contains(eliteChest.Id,game.State.openedTreasureIds);
+            Assert.IsTrue(game.Save());Assert.IsTrue(game.Saves.Load(out var restored,out _));
+            int ore=restored.Count("ore");Assert.IsFalse(ExplorationRules.OpenTreasure(restored,chest.Id,chest.Reward));
+            Assert.IsFalse(ExplorationRules.OpenTreasure(restored,eliteChest.Id,eliteChest.Reward));Assert.AreEqual(ore,restored.Count("ore"));
+            SceneManager.SetActiveScene(previous); yield return SceneManager.UnloadSceneAsync(scene);
+            scene=SceneManager.CreateScene("ReloadedExpansion");SceneManager.SetActiveScene(scene);game=new GameObject("Reloaded game").AddComponent<GameSession>();game.Begin(false);
+            Assert.IsFalse(game.World.Interactions.Find(i=>i.Id==r.Key("puzzle-cache")).Available);
+            Assert.IsFalse(game.World.Enemies.Find(e=>e.Id==r.Key("warden")).gameObject.activeSelf);
+            Assert.IsTrue(game.Exploration.Points.TryGet(r.Key("puzzle"),out var restoredPuzzle));Assert.IsTrue(restoredPuzzle.Completed);
+            yield return null;
+        }
+        [UnityTest] public IEnumerator ExpandedClimbAndGlideRoutesUseRealTerrainAndCollision()
+        {
+            game.Player.enabled=false;
+            foreach(var route in game.GetComponent<ExpandedWorld>().Routes) {
+                Teleport(route.foot+new Vector3(0,.15f,-7.7f));game.Player.transform.rotation=Quaternion.identity;
+                Assert.IsTrue(game.Player.Traversal.TryClimb(),route.region.Name+" climb");
+                for(int i=0;i<25;i++)game.Player.Traversal.Simulate(.02f,Vector3.zero,Vector2.up,false,false,false,false,false,false);
+                Assert.Greater(game.Player.transform.position.y,route.foot.y+.2f);
+                Teleport(route.launch);Assert.IsTrue(game.Player.Traversal.TryGlide(),route.region.Name+" launch");
+                for(int i=0;i<70;i++)game.Player.Traversal.Simulate(.02f,Vector3.forward,Vector2.up,false,false,false,false,false,false);
+                Assert.Greater(game.Player.transform.position.z,route.launch.z+4);
+                Assert.Less(game.Player.transform.position.y,route.launch.y);
+            }
+            yield return null;
         }
         [UnityTest] public IEnumerator DodgeInvulnerabilityExpiresBeforeRecovery()
         {

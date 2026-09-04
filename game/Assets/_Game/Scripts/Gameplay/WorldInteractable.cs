@@ -9,7 +9,7 @@ namespace WanderingCity
         public Dictionary<string, int> Reward;
         public ExplorationPoi Exploration;
         public PuzzleController Puzzle;
-        public bool Available => Exploration != null ? Exploration.Type != PoiType.Treasure || !Session.State.openedTreasureIds.Contains(Id) : Puzzle != null ? !Session.State.completedPuzzleIds.Contains("echo-puzzle") : Workbench || !Session.State.claimed.Contains(Id);
+        public bool Available => Exploration != null ? Exploration.Type != PoiType.Treasure || !Session.State.openedTreasureIds.Contains(Id) : Puzzle != null ? !Session.State.completedPuzzleIds.Contains(Puzzle.Id) : Workbench || !Session.State.claimed.Contains(Id);
         public void Interact()
         {
             if (!Session.Started || Session.Paused || !Session.Player.CanAct || Session.State.hp <= 0 || !Available || Vector3.Distance(transform.position, Session.Player.transform.position + Vector3.up) > 3.6f || !CombatVisibility.Clear(Session.Player.transform.position + Vector3.up, transform.position)) return;

@@ -48,6 +48,7 @@ namespace WanderingCity.Editor
                 if (TerrainHeightModel.RoadDistance(new Vector2(p.x, p.z)) < 2.8f) color = new Color(.72f, .65f, .43f);
                 foreach (var region in regions) if (region.Bounds.Contains(p)) color = Color.Lerp(color, LayerColor(region.Id), .12f);
                 foreach (var body in water) if (p.x >= body.min.x && p.x <= body.max.x && p.z >= body.min.z && p.z <= body.max.z && p.y <= body.max.y) color = new Color(.22f, .47f, .55f);
+                if(!ExpansionCatalog.Playable(new Vector2(p.x,p.z))) color *= .55f;
                 pixels[y * resolution + x] = color;
             }
             texture.SetPixels(pixels); texture.Apply(); Directory.CreateDirectory(Path.GetDirectoryName(OutputPath));

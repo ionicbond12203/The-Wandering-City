@@ -70,7 +70,7 @@ namespace WanderingCity
             Target = World.FindInteraction(Player.transform.position + Vector3.up);
             if (Target != null && kb.eKey.wasPressedThisFrame && Player.CanAct) Target.Interact();
             string region = WorldBuilder.Region(Player.transform.position);
-            if (!State.visited.Contains(region)) { State.visited.Add(region); Notify("发现地点 / " + WorldBuilder.RegionName(region)); Save(); }
+            if (Player.transform.position.x >= -105 && Player.transform.position.x <= 105 && Player.transform.position.z >= -35 && Player.transform.position.z <= 175 && !State.visited.Contains(region)) { State.visited.Add(region); Notify("发现地点 / " + WorldBuilder.RegionName(region)); Save(); }
             if (Time.unscaledTime > autoSaveAt) { Save(); autoSaveAt = Time.unscaledTime + 30; }
         }
         public void Result(bool ok, string success, string fail)

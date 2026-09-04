@@ -913,10 +913,10 @@ namespace WanderingCity.Editor
         public static TerrainData GenerateTerrainData(TerrainLayer[] layers)
         {
             var terrainData = AssetDatabase.LoadAssetAtPath<TerrainData>(TerrainDataPath);
-            if (terrainData != null && terrainData.name == "OpenWorld_v8") return terrainData;
+            if (terrainData != null && terrainData.name == "OpenWorld_v9_Content") return terrainData;
             bool create = terrainData == null;
             if (create) terrainData = new TerrainData();
-            terrainData.name = "OpenWorld_v8";
+            terrainData.name = "OpenWorld_v9_Content";
             int res = TerrainHeightModel.Resolution;
             terrainData.heightmapResolution = res;
             terrainData.size = new Vector3(TerrainHeightModel.Size, TerrainHeightModel.Height, TerrainHeightModel.Size);
@@ -952,7 +952,7 @@ namespace WanderingCity.Editor
                     float steepness = terrainData.GetSteepness(normX, normZ);
                     float worldY = terrainData.GetInterpolatedHeight(normX, normZ);
 
-                    float roadDist = MinPathDistance(new Vector2(worldX, worldZ));
+                    float roadDist = TerrainHeightModel.RoadDistance(new Vector2(worldX, worldZ));
                     float roadFactor = Mathf.Clamp01(1f - (roadDist / 3.5f));
 
                     float rockWeight = Mathf.Clamp01((steepness - 22f) / 18f);

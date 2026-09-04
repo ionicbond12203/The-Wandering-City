@@ -273,14 +273,9 @@ namespace WanderingCity.Editor
             {
                 navSurface = nav.AddComponent<NavMeshSurface>();
                 navSurface.collectObjects = CollectObjects.Volume;
-            navSurface.center = new Vector3(0, 40, 70);
-            navSurface.size = new Vector3(230, 110, 235);
-                navSurface.useGeometry = NavMeshCollectGeometry.PhysicsColliders;
             }
-            navSurface.collectObjects = CollectObjects.Volume;
-            navSurface.center = new Vector3(0,40,70);
-            navSurface.size = new Vector3(230,110,235);
-            navSurface.BuildNavMesh();
+            navSurface.RemoveData(); navSurface.enabled = false;
+            // Runtime PlayableNavigation builds one connected mesh clipped to actual regions and roads.
 
             // 4. Gameplay root with GameSession
             var gameplay = GameObject.Find("Gameplay");

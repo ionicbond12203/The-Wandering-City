@@ -16,7 +16,7 @@ namespace WanderingCity
         {
             if (s == null || s.version != 2 || s.hp < 0 || s.hp > 100 || s.weaponLevel < 1 || s.weaponLevel > 2 || s.inventory == null || s.inventory.Count > Rules.Slots || s.claimed == null || s.defeated == null || s.visited == null || s.hotbar == null || s.buildings == null) return false;
             if (!ExplorationRules.ValidIds(s.discoveredPOIIds, ExplorationCatalog.PoiIds) || !ExplorationRules.ValidIds(s.activatedTeleportIds, ExplorationCatalog.TeleportIds) || !ExplorationRules.ValidIds(s.discoveredRegionIds, ExplorationCatalog.RegionIds) || !ExplorationRules.ValidIds(s.openedTreasureIds, ExplorationCatalog.TreasureIds) || !ExplorationRules.ValidIds(s.completedPuzzleIds, ExplorationCatalog.PuzzleIds)) return false;
-            if (s.activatedTeleportIds.Any(id => !s.discoveredPOIIds.Contains(id)) || (s.openedTreasureIds.Contains("canyon-cache") && !s.completedPuzzleIds.Contains("echo-puzzle"))) return false;
+            if (s.activatedTeleportIds.Any(id => !s.discoveredPOIIds.Contains(id)) || s.openedTreasureIds.Any(id=>!ExpansionCatalog.RewardUnlocked(s,id))) return false;
             if (s.inventory.Any(p => p == null || !Rules.Items.Contains(p.id) || p.count <= 0 || p.count > Rules.StackLimit) || s.claimed.Any(id => !WorldCatalog.RewardIds.Contains(id)) || s.defeated.Any(id => !WorldCatalog.EnemyIds.Contains(id))) return false;
             if (s.claimed.Count != s.claimed.Distinct().Count() || s.defeated.Count != s.defeated.Distinct().Count() || s.hotbar.Count != 4 || s.hotbar.Any(id => !Rules.Items.Contains(id)) || s.selectedSlot < 0 || s.selectedSlot > 3 || s.visited.Any(id => !new[] { "camp", "forest", "quarry", "ruins" }.Contains(id))) return false;
             if (s.claimed.Contains("camp-reward") && !WorldCatalog.CampEnemies.All(s.defeated.Contains)) return false;
@@ -28,7 +28,7 @@ namespace WanderingCity
         }
         public static void SafePosition(GameState s)
         {
-            if (s.hp == 0 || !float.IsFinite(s.x) || !float.IsFinite(s.y) || !float.IsFinite(s.z) || Math.Abs(s.x) > 105 || s.z < -35 || s.z > 170 || s.y < -2 || s.y > 25) { s.x = 0; s.y = 1; s.z = 0; s.hp = 100; }
+            if (s.hp == 0 || !float.IsFinite(s.x) || !float.IsFinite(s.y) || !float.IsFinite(s.z) || !ExpansionCatalog.Playable(new Vector2(s.x,s.z), 35) || s.y < -2 || s.y > TerrainHeightModel.Height + 60) { s.x = 0; s.y = 1; s.z = 0; s.hp = 100; }
             if (!float.IsFinite(s.yaw)) s.yaw = 0;
         }
         bool Read(string file, out GameState state)

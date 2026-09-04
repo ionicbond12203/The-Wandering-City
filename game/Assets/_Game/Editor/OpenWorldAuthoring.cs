@@ -90,7 +90,7 @@ namespace WanderingCity.Editor
             }
             bool resetDetails=data.detailScatterMode!=DetailScatterMode.InstanceCountMode;
             if(resetDetails) data.SetDetailScatterMode(DetailScatterMode.InstanceCountMode);
-            if(data.detailPrototypes.Length!=4 || resetDetails)
+            if(data.detailPrototypes.Length!=4 || resetDetails || !System.IO.File.Exists("Assets/_Game/Art/Environment/ExpandedDetails_v2.txt"))
             {
                 data.SetDetailResolution(1024,32);data.detailPrototypes=prototypes;
                 for(int k=0;k<4;k++)
@@ -106,12 +106,21 @@ namespace WanderingCity.Editor
                     data.SetDetailLayer(0,0,k,density);
                 }
             }
+            System.IO.File.WriteAllText("Assets/_Game/Art/Environment/ExpandedDetails_v2.txt", "Region grass coverage v2");
             Traveler(mats);
             EditorUtility.SetDirty(data);AssetDatabase.SaveAssets();
         }
         public static bool GrassAllowed(float x,float z)
         {
-            if(x < -170 || x>180 || z < -100 || z>230) return false;
+            if(!ExpansionCatalog.Playable(new Vector2(x,z))) return false;
+            foreach(var region in ExpansionCatalog.Regions) {
+                if(Vector2.Distance(new Vector2(x,z),region.Center)<95) {
+                    float coverage=region.Id=="sun-quarry"?.72f:region.Id=="crown-ruins"?.5f:region.Id=="veil-canyon"?.25f:0;
+                    if(Mathf.PerlinNoise(x*.035f+110,z*.035f+220)<coverage)return false;
+                }
+                foreach(var site in region.Sites) if(Vector2.Distance(new Vector2(x,z),region.Center+site)<5) return false;
+                var foot=region.At(14); if(x>foot.x-58 && x<foot.x+12 && Mathf.Abs(z-foot.y)<12) return false;
+            }
             if(TerrainHeightModel.RoadDistance(new Vector2(x,z))<2.8f) return false;
             if(x>-16&&x<14&&z>-8&&z<12) return false;
             if(x>24&&x<100&&z>-23&&z<44) return false;
@@ -182,6 +191,7 @@ namespace WanderingCity.Editor
             var landmarks=environment.transform.Find("Landmarks");
             if(landmarks!=null) foreach(Transform landmark in landmarks)
                 if(landmark.name.Contains("Monolith")) landmark.position=WorldBuilder.GroundPoint(108,115);
+            ExpansionAuthoring.Populate(environment, mats);
             terrain.detailObjectDistance=70;terrain.detailObjectDensity=1;terrain.drawInstanced=true;
             var middle=environment.transform.Find("Midground");
             if(middle==null) {middle=new GameObject("Midground").transform;middle.SetParent(environment.transform);}

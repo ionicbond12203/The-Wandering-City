@@ -60,7 +60,7 @@ namespace WanderingCity
 
             var minimapRoot = Rect(new GameObject("Circular minimap", typeof(RectTransform)), topRight, 10, 12, 240, 240);
             Minimap = minimapRoot.gameObject.AddComponent<CircularMinimap>(); Minimap.Create(session, font);
-            Label(topCenter, "N  /  风息原野", 305, 0, 380, 30, 20, gold, TextAlignmentOptions.Center);
+            Label(topCenter, "N  /  北", 305, 0, 380, 30, 20, gold, TextAlignmentOptions.Center);
             status = Label(bottomLeft, "", 0, 0, 490, 45, 22, ivory);
             Box(bottomLeft, "HP track", 0, 51, 355, 10, new Color(.12f, .22f, .22f, .9f));
             health = Box(bottomLeft, "HP", 0, 51, 355, 10, new Color(.51f, .8f, .6f));
@@ -129,7 +129,7 @@ namespace WanderingCity
                 bool visible = !session.Paused && row.enemy.gameObject.activeSelf && Vector3.Distance(session.Player.transform.position, row.enemy.transform.position) < 20;
                 Vector3 p = Camera.main.WorldToScreenPoint(row.enemy.transform.position + Vector3.up * 2.5f); visible &= p.z > 0;
                 row.rect.gameObject.SetActive(visible);
-                if (visible) { row.rect.position = new Vector3(p.x - 80 * canvas.scaleFactor, p.y, 0); row.text.text = "遗迹守卫 " + row.enemy.Hp + "/104\n" + (row.enemy.Action == EnemyAction.Attack ? "<color=#FFB26D>蓄力攻击 · 闪避！</color>" : ""); }
+                if (visible) { row.rect.position = new Vector3(p.x - 80 * canvas.scaleFactor, p.y, 0); row.text.text = (row.enemy.Elite ? "区域守望者 " : "遗迹守卫 ") + row.enemy.Hp + "/" + row.enemy.MaxHp + "\n" + (row.enemy.Action == EnemyAction.Attack ? "<color=#FFB26D>蓄力攻击 · 闪避！</color>" : ""); }
             }
             menu.gameObject.SetActive(session.Paused);
             if (Page != renderedPage) { RenderMenu(); renderedPage = Page; }
@@ -209,7 +209,8 @@ namespace WanderingCity
                 if (!session.State.visited.Contains(point.Item1)) continue;
                 var p = Map(point.Item2); Label(map, WorldBuilder.RegionName(point.Item1), p.x - 70, p.y, 180, 30, 18, ivory);
             }
-            int row = 0;
+            string selectedTeleport = null;
+            Button(menu, "传送至所选信标", 1280, 450, 430, () => { if(selectedTeleport != null) session.Exploration.Teleport(selectedTeleport); else session.Notify("请先在地图选择已激活信标"); });
             foreach (var poi in session.Exploration.Points.Values)
             {
                 if (!WorldMapData.Visible(session.State, poi.Id)) continue;
@@ -217,19 +218,14 @@ namespace WanderingCity
                 var marker = MapMarker(poi.Id, p, 14, poi.Completed ? new Color(.3f, .9f, .85f) : gold); marker.raycastTarget = true;
                 marker.rectTransform.sizeDelta = Vector2.one * 14;
                 var select = marker.gameObject.AddComponent<Button>();
-                select.onClick.AddListener(() => details.text = poi.DisplayName + "\n" + (poi.Type == PoiType.TeleportPoint ? "传送信标" : "兴趣点") + (poi.Completed ? " / 已完成" : " / 已发现") + "\n距离 " + Mathf.RoundToInt(Vector3.Distance(session.Player.transform.position, poi.transform.position)) + " m" + (poi.Type == PoiType.TeleportPoint ? (session.State.activatedTeleportIds.Contains(poi.Id) ? "\n信标已激活，可选择右侧传送按钮。" : "\n靠近信标按 E 激活。") : ""));
-                if (poi.Type == PoiType.TeleportPoint)
-                {
-                    string id = poi.Id;
-                    if (session.State.activatedTeleportIds.Contains(id)) Button(menu, "传送 / " + poi.DisplayName, 1280, 430 + row++ * 80, 430, () => session.Exploration.Teleport(id));
-                    else Label(menu, poi.DisplayName + " / 待激活", 1280, 430 + row++ * 80, 430, 70, 22, gold);
-                }
+                select.onClick.AddListener(() => { selectedTeleport = poi.Type == PoiType.TeleportPoint && session.State.activatedTeleportIds.Contains(poi.Id) ? poi.Id : null; details.text = poi.DisplayName + "\n" + (poi.Type == PoiType.TeleportPoint ? "传送信标" : "兴趣点") + (poi.Completed ? " / 已完成" : " / 已发现") + "\n距离 " + Mathf.RoundToInt(Vector3.Distance(session.Player.transform.position, poi.transform.position)) + " m" + (poi.Type == PoiType.TeleportPoint ? (session.State.activatedTeleportIds.Contains(poi.Id) ? "\n信标已激活，可选择右侧传送按钮。" : "\n靠近信标按 E 激活。") : ""); });
+
             }
             var activeObjective = WorldMapData.ObjectivePosition(session);
             if (activeObjective.HasValue) { var p = Map(activeObjective.Value); var target = MapMarker("Quest objective", p, 12, gold); target.gameObject.AddComponent<Button>().onClick.AddListener(() => details.text = Rules.Objective(session.State)); }
             Vector2 player = Map(session.Player.transform.position); MapMarker("You", player, 14, Color.white).raycastTarget = false;
             navigation.Focus(player, 3);
-            Label(menu, "白点 / 旅人   青色 / 已完成\n滚轮缩放 · 拖拽平移\n信标须先靠近并按 E 激活", 1280, 295, 450, 125, 23, ivory);
+            Label(menu, "白点 / 旅人   青色 / 已完成\n滚轮缩放 · 拖拽平移\n信标须先靠近并按 E 激活\n暗色地形 / 远景荒野", 1280, 285, 450, 145, 23, ivory);
             Label(menu, "兴趣点 " + session.State.discoveredPOIIds.Count + "/" + ExplorationCatalog.PoiIds.Count + "   ·   金色 / 当前目标", 1020, 875, 700, 50, 21, gold);
             Button(menu, "切换小地图方向", 1020, 780, 700, () => { Minimap.Orientation = Minimap.Orientation == MinimapOrientation.NorthUp ? MinimapOrientation.RotateWithPlayer : MinimapOrientation.NorthUp; details.text = "小地图方向：" + (Minimap.Orientation == MinimapOrientation.NorthUp ? "北向固定" : "跟随旅人旋转"); });
         }
