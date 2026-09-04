@@ -58,70 +58,7 @@ namespace WanderingCity.Editor
             Debug.Log("WANDERING_CITY_PREPARE_OK");
         }
 
-        static void EnsureTravelerController()
-        {
-            if (!File.Exists("Assets/_Game/Resources/Traveler.controller"))
-            {
-                var controller = AnimatorController.CreateAnimatorControllerAtPath("Assets/_Game/Resources/Traveler.controller");
-                controller.AddParameter("Speed", AnimatorControllerParameterType.Float);
-                controller.AddParameter("Action", AnimatorControllerParameterType.Int);
-                var machine = controller.layers[0].stateMachine;
-                for (int i = 0; i < 5; i++)
-                {
-                    var clip = new AnimationClip { name = ((PlayerAction)i).ToString() };
-                    clip.SetCurve("", typeof(Transform), "localEulerAnglesRaw.z", AnimationCurve.EaseInOut(0, i == 2 ? -12 : 0, .4f, i == 4 ? 75 : 0));
-                    AssetDatabase.AddObjectToAsset(clip, controller);
-                    var state = machine.AddState(clip.name);
-                    state.motion = clip;
-                    if (i == 0) machine.defaultState = state;
-                    var transition = machine.AddAnyStateTransition(state);
-                    transition.hasExitTime = false;
-                    transition.duration = .1f;
-                    transition.canTransitionToSelf = false;
-                    transition.AddCondition(AnimatorConditionMode.Equals, i, "Action");
-                }
-            }
-
-            var traveler = AssetDatabase.LoadAssetAtPath<AnimatorController>("Assets/_Game/Resources/Traveler.controller");
-            string[] requiredParams = { "Speed", "Action", "VerticalVelocity", "Grounded", "Climbing", "Gliding", "Attack", "Dodge", "Dead", "Traversal" };
-            foreach (string parameter in requiredParams)
-            {
-                if (!System.Array.Exists(traveler.parameters, p => p.name == parameter))
-                {
-                    var paramType = parameter == "Speed" || parameter == "VerticalVelocity" ? AnimatorControllerParameterType.Float :
-                                    parameter == "Action" || parameter == "Traversal" ? AnimatorControllerParameterType.Int :
-                                    AnimatorControllerParameterType.Bool;
-                    traveler.AddParameter(parameter, paramType);
-                }
-            }
-
-            var traversalMachine = traveler.layers[0].stateMachine;
-            foreach (var transition in traversalMachine.anyStateTransitions)
-            {
-                if (transition.destinationState != null && transition.destinationState.name == "Move" && !System.Array.Exists(transition.conditions, c => c.parameter == "Traversal"))
-                    transition.AddCondition(AnimatorConditionMode.Less, 4, "Traversal");
-            }
-
-            foreach (var mode in new[] { TraversalState.Climb, TraversalState.LedgeTransition, TraversalState.Glide })
-            {
-                string name = "Traversal / " + mode;
-                if (System.Array.Exists(traversalMachine.states, s => s.state.name == name)) continue;
-                var clip = new AnimationClip { name = name };
-                clip.SetCurve("", typeof(Transform), "localEulerAnglesRaw.x", AnimationCurve.Constant(0, 1, mode == TraversalState.Glide ? 18 : -8));
-                AssetDatabase.AddObjectToAsset(clip, traveler);
-                var state = traversalMachine.AddState(name);
-                state.motion = clip;
-                var transition = traversalMachine.AddAnyStateTransition(state);
-                transition.hasExitTime = false;
-                transition.duration = .15f;
-                transition.canTransitionToSelf = false;
-                transition.AddCondition(AnimatorConditionMode.Equals, 0, "Action");
-                transition.AddCondition(AnimatorConditionMode.Equals, (int)mode, "Traversal");
-            }
-
-            EditorUtility.SetDirty(traveler);
-            EditorUtility.SetDirty(AssetDatabase.LoadAssetAtPath<GameBalance>("Assets/_Game/Resources/Balance.asset"));
-        }
+        static void EnsureTravelerController() => CharacterAuthoring.EnsureController();
 
         public static void EnsureWorldScene()
         {

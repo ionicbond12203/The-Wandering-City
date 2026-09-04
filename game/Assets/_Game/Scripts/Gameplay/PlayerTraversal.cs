@@ -14,6 +14,7 @@ namespace WanderingCity
         public bool Grounded { get; private set; }
         public bool BlocksCombat => State == TraversalState.Climb || State == TraversalState.LedgeTransition || State == TraversalState.Glide;
         public bool LandedThisStep { get; private set; }
+        public Vector2 ClimbInput { get; private set; }
         GameBalance B => Motor.Session.Balance;
         CharacterController C => Motor.Controller;
         Vector3 horizontal, normal, ledgeTarget, ledgeLift;
@@ -29,7 +30,7 @@ namespace WanderingCity
         }
         public void ResetMotion(bool refill = false)
         {
-            State = TraversalState.Grounded; horizontal = Vector3.zero; VerticalVelocity = 0; grace = buffer = detach = 0; Grounded = false;
+            ClimbInput = Vector2.zero; State = TraversalState.Grounded; horizontal = Vector3.zero; VerticalVelocity = 0; grace = buffer = detach = 0; Grounded = false;
             if (refill) Stamina?.Refill();
         }
         public void Interrupt()
@@ -89,6 +90,7 @@ namespace WanderingCity
         public void Simulate(float dt, Vector3 direction, Vector2 input, bool sprint, bool walk, bool jump, bool climb, bool glide, bool cancel, Vector3? forcedVelocity = null)
         {
             if (dt <= 0 || !Motor.Session.InputReady || Motor.Action == PlayerAction.Dead) return;
+            ClimbInput = State == TraversalState.Climb ? input : Vector2.zero;
             if (jump && CanTraverse && !BlocksCombat) buffer = B.jumpBuffer;
             if (cancel && BlocksCombat) Detach();
             if (climb) { if (State == TraversalState.Climb) Detach(); else TryClimb(); }
@@ -130,8 +132,8 @@ namespace WanderingCity
                 else if (Vector3.Angle(normal, wall.normal) > B.cornerAngle) Detach();
                 else
                 {
-                    normal = Vector3.Slerp(normal, wall.normal, B.turnSpeed * dt).normalized;
-                    transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(-normal), B.turnSpeed * dt);
+                    normal = Vector3.Slerp(normal, wall.normal, 1 - Mathf.Exp(-B.turnSpeed * dt)).normalized;
+                    transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(-normal), 1 - Mathf.Exp(-B.turnSpeed * dt));
                     Vector3 lateral = Vector3.Cross(Vector3.up, normal);
                     float correction = wall.distance - C.radius - B.wallGap;
                     Move((Vector3.up * input.y - lateral * input.x) * B.climbSpeed * dt - normal * Mathf.Clamp(correction, -B.climbSpeed * dt, B.climbSpeed * dt));
@@ -171,7 +173,7 @@ namespace WanderingCity
                     State = Grounded ? runningFast ? TraversalState.Sprint : TraversalState.Grounded : VerticalVelocity > 0 ? TraversalState.Jump : TraversalState.Fall;
                     if (runningFast) drain = B.sprintDrain;
                 }
-                if (direction.sqrMagnitude > .01f && Motor.Action == PlayerAction.Move) transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(direction), B.turnSpeed * dt);
+                if (direction.sqrMagnitude > .01f && Motor.Action == PlayerAction.Move) transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(direction), 1 - Mathf.Exp(-B.turnSpeed * dt));
                 C.stepOffset = Grounded ? B.stepHeight : 0;
                 Vector3 motion = forcedVelocity ?? horizontal;
                 if (Grounded && VerticalVelocity <= 0 && Physics.SphereCast(transform.position + Vector3.up * (C.radius + .2f), C.radius * .85f, Vector3.down, out var ground, .5f, B.solidMask, QueryTriggerInteraction.Ignore) && Vector3.Angle(ground.normal, Vector3.up) <= C.slopeLimit)

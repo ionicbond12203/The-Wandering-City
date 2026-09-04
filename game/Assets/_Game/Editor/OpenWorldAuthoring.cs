@@ -153,6 +153,7 @@ namespace WanderingCity.Editor
             var socket=new GameObject("Sword pivot");socket.transform.SetParent(root.transform,false);socket.transform.localPosition=new Vector3(.45f,1,.1f);
             Part(socket.transform,"Blade",cloth,mats["Rock"],new Vector3(0,0,.7f),new Vector3(.1f,.1f,1.3f));
             root.AddComponent<Animator>().runtimeAnimatorController=AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>("Assets/_Game/Resources/Traveler.controller");
+            CharacterAuthoring.RigPrototype(root);
             PrefabUtility.SaveAsPrefabAsset(root,"Assets/_Game/Resources/Traveler_Stylized.prefab");Object.DestroyImmediate(root);
         }
         public static void Populate( GameObject environment, Terrain terrain, Dictionary<string,Material> mats)

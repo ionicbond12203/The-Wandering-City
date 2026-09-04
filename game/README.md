@@ -28,6 +28,10 @@ Windows 键鼠和风格化几何占位资产采用技术方案的实施基线。
 | 建造模式 | B；1 地板、2 墙、3 屋顶；R 旋转；左键放置；X 拆除 |
 | 手动保存 | F5，或暂停菜单 |
 
+## Milestone 04 / 角色动画管线
+
+角色现支持独立关节演示、移动混合树、跳跃/落地/攀爬/滑翔/三段攻击状态，以及武器、背部、风帆和镜头挂点。攻击恢复期点击左键衔接下一段，或右键/左 Ctrl 闪避取消。通过 `Resources/CharacterPresentation.asset` 指定角色 prefab，再用 `CharacterRigBindings` 与动画集接入正式 Humanoid。当前仍是原创关节原型，正式模型、蒙皮和配套动画尚缺。接入步骤、限制与验证见 [角色动画管线记录](../docs/角色动画管线记录.md)。
+
 ## Milestone 05 / 内容扩展
 
 现有地形内新增逐风花原、雾叶古林、琥珀断岩场、星冠旧城、回音帷谷。有效内容跨度约 695m，共 84 个兴趣点、35 名敌人和 7 个信标；各新区包含谜题、精英、隐藏宝箱以及攀爬滑翔路线。导航限定于玩法区域，远处探索进度支持存档。105 项测试与 Windows 构建验收通过；测量、截图及性能边界见 [开放世界内容扩展记录](../docs/开放世界内容扩展记录.md)。
@@ -68,7 +72,7 @@ Milestone 07 已加入安全区锚点 HUD 和圆形小地图：玩家居中、�
 - `Scripts/Core`：独立资源规则、配置与版本化存档；所有资源修改先校验后提交。
 - `Scripts/Gameplay`：CharacterController、Cinemachine 镜头、NavMesh 敌人、交互和固定地图生成。
 - `Scripts/UI`：uGUI + TextMeshPro 中文 HUD、背包、工作台、暂停与地图。
-- `Resources/Balance.asset`：战斗数值配置；`Traveler.controller`：占位状态动画。
+- `Resources/Balance.asset`：战斗数值配置；`Traveler.controller`：角色状态机和原创原型动画，可通过动画集覆盖。
 - `Tests/EditMode`：资源守恒、幂等、非法状态、建筑依赖、存档损坏和完整流程。
 - `Tests/PlayMode`：实际场景的攻击遮挡、碰撞、交互、重生、建筑与奖励恢复。
 

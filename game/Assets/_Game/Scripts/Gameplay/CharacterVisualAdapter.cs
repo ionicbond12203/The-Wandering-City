@@ -12,99 +12,77 @@ namespace WanderingCity
         public Animator Animator;
         public bool IsFallbackMode { get; private set; }
 
+        public CharacterRigBindings Rig { get; private set; }
+        public CharacterAnimationDriver Driver { get; private set; }
+        public bool MissingAuthoredAnimations { get; private set; }
+        AnimatorOverrideController ownedController;
+
         public void Setup(PlayerMotor motor, GameObject customPrefab = null)
         {
             if (PlayerVisualRoot == null)
             {
-                var existing = transform.Find("PlayerVisualRoot");
-                if (existing != null)
+                PlayerVisualRoot = transform.Find("PlayerVisualRoot");
+                if (PlayerVisualRoot == null)
                 {
-                    PlayerVisualRoot = existing;
-                }
-                else
-                {
-                    var rootGo = new GameObject("PlayerVisualRoot");
-                    rootGo.transform.SetParent(transform, false);
-                    PlayerVisualRoot = rootGo.transform;
+                    PlayerVisualRoot = new GameObject("PlayerVisualRoot").transform;
+                    PlayerVisualRoot.SetParent(transform, false);
                 }
             }
-
-            // Clear old children under PlayerVisualRoot if any
             for (int i = PlayerVisualRoot.childCount - 1; i >= 0; i--)
             {
-                var child = PlayerVisualRoot.GetChild(i);
-                if (Application.isPlaying) Destroy(child.gameObject);
-                else DestroyImmediate(child.gameObject);
+                var child = PlayerVisualRoot.GetChild(i).gameObject;
+                child.SetActive(false);
+                if (Application.isPlaying) Destroy(child); else DestroyImmediate(child);
             }
-
-            CharacterPrefabSlot = customPrefab != null ? customPrefab : Resources.Load<GameObject>("Traveler_Stylized");
-
-            bool forceFallback = DevelopmentVisualMode.UseFallbackPrimitives;
-            if (!forceFallback && CharacterPrefabSlot != null)
+            // Respect an Inspector-assigned slot when no call-site override was supplied.
+            if (customPrefab != null) CharacterPrefabSlot = customPrefab;
+            if (CharacterPrefabSlot == null) CharacterPrefabSlot = Resources.Load<CharacterPresentationSettings>("CharacterPresentation")?.CharacterPrefabSlot;
+            if (CharacterPrefabSlot == null) CharacterPrefabSlot = Resources.Load<GameObject>("Traveler_Stylized");
+            Blade = GlideSail = null;
+            IsFallbackMode = DevelopmentVisualMode.UseFallbackPrimitives;
+            GameObject instance;
+            if (!IsFallbackMode && CharacterPrefabSlot != null)
             {
-                var charInst = Instantiate(CharacterPrefabSlot, PlayerVisualRoot, false);
-                charInst.name = "StylizedCharacter";
-                IsFallbackMode = false;
-
-                var bladeHook = charInst.transform.Find("Sword pivot") ?? charInst.transform.Find("Blade");
-                if (bladeHook != null)
-                {
-                    Blade = bladeHook;
-                }
-                else
-                {
-                    var pivot = new GameObject("Sword pivot").transform;
-                    pivot.SetParent(PlayerVisualRoot, false);
-                    pivot.localPosition = new Vector3(.45f, 1f, .1f);
-                    Blade = pivot;
-                }
-
-                var sailHook = charInst.transform.Find("GlideSail") ?? charInst.transform.Find("Traveler / folding wind sail");
-                if (sailHook != null)
-                {
-                    GlideSail = sailHook;
-                }
-                else
-                {
-                    GlideSail = CreateStylizedSail(PlayerVisualRoot);
-                }
-
-                Animator = charInst.GetComponentInChildren<Animator>();
-                if (Animator == null)
-                {
-                    Animator = PlayerVisualRoot.gameObject.AddComponent<Animator>();
-                }
-            }
-            else if (!forceFallback)
-            {
-                CreateStylizedTraveler(PlayerVisualRoot);
-                IsFallbackMode = false;
-                Animator = PlayerVisualRoot.gameObject.AddComponent<Animator>();
+                instance = Instantiate(CharacterPrefabSlot, PlayerVisualRoot, false);
+                instance.name = "Character";
             }
             else
             {
-                CreateDebugPrimitives(PlayerVisualRoot);
-                IsFallbackMode = true;
-                Animator = PlayerVisualRoot.gameObject.AddComponent<Animator>();
+                if (IsFallbackMode) CreateDebugPrimitives(PlayerVisualRoot); else CreateStylizedTraveler(PlayerVisualRoot);
+                instance = PlayerVisualRoot.GetChild(0).gameObject;
             }
-
-            if (Animator != null && Animator.runtimeAnimatorController == null)
+            // Render assets cannot introduce a second collision / root-motion authority.
+            foreach (var col in instance.GetComponentsInChildren<Collider>(true)) col.enabled = false;
+            foreach (var body in instance.GetComponentsInChildren<Rigidbody>(true)) { body.isKinematic = true; body.detectCollisions = false; }
+            Animator = instance.GetComponentInChildren<Animator>(true);
+            if (Animator == null) Animator = instance.AddComponent<Animator>();
+            foreach (var animator in instance.GetComponentsInChildren<Animator>(true)) { animator.applyRootMotion = false; if (animator != Animator) animator.enabled = false; }
+            Rig = instance.GetComponent<CharacterRigBindings>() ?? instance.AddComponent<CharacterRigBindings>();
+            Rig.Resolve(Animator);
+            if (Blade == null)
             {
-                Animator.runtimeAnimatorController = Resources.Load<RuntimeAnimatorController>("Traveler");
-                Animator.applyRootMotion = false;
+                foreach (var t in instance.GetComponentsInChildren<Transform>(true)) if (t.name == "Sword pivot") { Blade = t; break; }
+                if (Blade == null) Blade = new GameObject("Sword pivot").transform;
             }
-
+            Blade.SetParent(Rig.Weapon, false); Blade.localPosition = Vector3.zero; Blade.localRotation = Quaternion.identity;
+            if (GlideSail == null) GlideSail = CreateStylizedSail(Rig.Glider);
+            GlideSail.SetParent(Rig.Glider, false); GlideSail.localPosition = Vector3.zero;
+            var controller = Resources.Load<RuntimeAnimatorController>("Traveler");
+            if (ownedController != null) { if (Application.isPlaying) Destroy(ownedController); else DestroyImmediate(ownedController); }
+            MissingAuthoredAnimations = !Rig.IsPrototype && (Rig.Animations == null || !Rig.Animations.Complete);
+            ownedController = Rig.Animations != null ? Rig.Animations.Apply(controller) : null;
+            Animator.runtimeAnimatorController = ownedController != null ? ownedController : controller;
+            Animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
             if (motor != null)
             {
-                motor.Visual = PlayerVisualRoot;
-                motor.Blade = Blade;
-                motor.GlideSail = GlideSail;
-                motor.Animator = Animator;
-                motor.VisualAdapter = this;
+                motor.Visual = PlayerVisualRoot; motor.Blade = Blade; motor.GlideSail = GlideSail;
+                motor.Animator = Animator; motor.VisualAdapter = this;
+                Driver = GetComponent<CharacterAnimationDriver>() ?? gameObject.AddComponent<CharacterAnimationDriver>();
+                Driver.Motor = motor; Driver.Rig = Rig; Driver.ResetPresentation();
             }
-
-            if (GlideSail != null) GlideSail.gameObject.SetActive(false);
+            GlideSail.gameObject.SetActive(false);
         }
+        void OnDestroy() { if (ownedController != null) Destroy(ownedController); }
 
         void CreateStylizedTraveler(Transform root)
         {

@@ -33,7 +33,7 @@ namespace WanderingCity
             var traversal = Session.Player.Traversal; var balance = Session.Balance;
             float desiredFov = traversal.State == TraversalState.Sprint ? balance.sprintFov : balance.cameraFov;
             virtualCamera.Lens.FieldOfView = Mathf.Lerp(virtualCamera.Lens.FieldOfView, desiredFov, 1 - Mathf.Exp(-balance.cameraBlend * Time.deltaTime));
-            Quaternion rotation = Quaternion.Euler(Pitch, Yaw, 0); Vector3 focus = Target.position + Vector3.up * (balance.cameraFocusHeight + (traversal.State == TraversalState.Climb ? balance.climbCameraHeight : 0)); Vector3 back = rotation * Vector3.back;
+            Quaternion rotation = Quaternion.Euler(Pitch, Yaw, 0); Vector3 focus = (Session.Player.VisualAdapter?.Rig?.CameraFocus != null ? Session.Player.VisualAdapter.Rig.CameraFocus.position : Target.position + Vector3.up * balance.cameraFocusHeight) + Vector3.up * (traversal.State == TraversalState.Climb ? balance.climbCameraHeight : 0); Vector3 back = rotation * Vector3.back;
             float desiredDistance = distance + (traversal.State == TraversalState.Glide ? balance.glideCameraDistance : 0);
             smoothDistance = Mathf.Lerp(smoothDistance, desiredDistance, 1 - Mathf.Exp(-balance.cameraBlend * Time.deltaTime));
             float actual = smoothDistance;

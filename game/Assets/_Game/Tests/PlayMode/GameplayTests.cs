@@ -27,6 +27,61 @@ namespace WanderingCity.Tests
             SceneManager.SetActiveScene(previous); yield return SceneManager.UnloadSceneAsync(scene); GameSession.SavePathOverride = null; if (Directory.Exists(folder)) Directory.Delete(folder, true);
         }
         void Teleport(Vector3 p) { game.State.x = p.x; game.State.y = p.y; game.State.z = p.z; game.Player.RestorePosition(); Physics.SyncTransforms(); }
+        [UnityTest] public IEnumerator CharacterDriverFollowsTraversalAndMeasuredDisplacement()
+        {
+            var p = game.Player; p.enabled = false; var driver = p.VisualAdapter.Driver; driver.enabled = false;
+            Teleport(WorldBuilder.GroundPoint(0, -8, .15f)); driver.ResetPresentation();
+            for (int i = 0; i < 30; i++) { p.Traversal.Simulate(.02f, Vector3.forward, Vector2.up, false, false, false, false, false, false); driver.Tick(.02f); }
+            Assert.Greater(p.Animator.GetFloat("MoveSpeed"), 2); Assert.AreEqual(0, driver.Pose);
+            p.Traversal.Simulate(.02f, Vector3.forward, Vector2.up, false, false, true, false, false, false); driver.Tick(.02f);
+            Assert.Greater(p.Animator.GetFloat("VerticalVelocity"), 0); Assert.AreEqual(2, driver.Pose);
+            Teleport(WorldBuilder.GroundPoint(0, -8, 8)); Assert.IsTrue(p.Traversal.TryGlide()); driver.Tick(.02f);
+            Assert.IsTrue(p.Animator.GetBool("Glide")); Assert.AreEqual(14, driver.Pose); Assert.IsTrue(p.GlideSail.gameObject.activeSelf);
+            var route = game.GetComponent<ExpandedWorld>().Routes[0]; Teleport(route.foot + new Vector3(0, .15f, -7.7f)); p.transform.rotation = Quaternion.identity;
+            Assert.IsTrue(p.Traversal.TryClimb()); p.Traversal.Simulate(.02f, Vector3.zero, new Vector2(.25f, 1), false, false, false, false, false, false); driver.Tick(.02f);
+            Assert.IsTrue(p.Animator.GetBool("Climb")); Assert.AreEqual(1, p.Animator.GetFloat("ClimbY")); Assert.AreEqual(12, driver.Pose);
+            yield return null;
+        }
+        [UnityTest] public IEnumerator FallLandingImpactAndWallIdleUsePhysicalMotion()
+        {
+            var p = game.Player; p.enabled = false; var driver = p.VisualAdapter.Driver; driver.enabled = false;
+            Teleport(WorldBuilder.GroundPoint(0, -8, 5)); bool fall = false, land = false;
+            for (int i = 0; i < 100; i++)
+            {
+                p.Traversal.Simulate(.02f, Vector3.zero, Vector2.zero, false, false, false, false, false, false); driver.Tick(.02f);
+                fall |= driver.Pose == 3; land |= driver.Pose == 4;
+            }
+            Assert.IsTrue(fall); Assert.IsTrue(land); Assert.Greater(driver.LandingWeight, .4f);
+            // No displacement means zero locomotion even if a previous move had nonzero input.
+            for (int i = 0; i < 40; i++) driver.Tick(.02f);
+            Assert.Less(p.Animator.GetFloat("MoveSpeed"), .05f);
+            Assert.IsTrue(p.StartAttack()); p.AdvanceAction(.2f); driver.Tick(.02f);
+            Assert.AreEqual(.2f / game.Balance.attackRecoveryEnd, p.Animator.GetFloat("ActionPhase"), .001f);
+            yield return null;
+        }
+        [UnityTest] public IEnumerator ComboAndCancelWindowsStayIndependentOfAnimator()
+        {
+            var p = game.Player; p.enabled = false; p.Animator.enabled = false;
+            Assert.IsTrue(p.StartAttack()); Assert.IsFalse(p.StartAttack()); Assert.IsFalse(p.StartDodge(Vector3.forward));
+            p.AdvanceAction(game.Balance.attackHitEnd + .01f); Assert.IsTrue(p.StartAttack());
+            p.AdvanceAction(game.Balance.attackRecoveryEnd); Assert.AreEqual(2, p.AttackIndex); Assert.AreEqual(PlayerAction.Attack, p.Action);
+            p.AdvanceAction(game.Balance.attackHitEnd + .01f); Assert.IsTrue(p.StartAttack());
+            p.AdvanceAction(game.Balance.attackRecoveryEnd); Assert.AreEqual(3, p.AttackIndex);
+            p.AdvanceAction(game.Balance.attackHitEnd + .01f); Assert.IsFalse(p.StartAttack()); Assert.IsTrue(p.StartDodge(Vector3.forward));
+            Assert.AreEqual(PlayerAction.Dodge, p.Action); p.AdvanceAction(game.Balance.dodgeDuration); Assert.AreEqual(PlayerAction.Move, p.Action);
+            yield return null;
+        }
+        [UnityTest] public IEnumerator DeadCharacterCannotRestartAnyActionOrTraversal()
+        {
+            var p = game.Player; p.enabled = false; var driver = p.VisualAdapter.Driver; driver.enabled = false;
+            Assert.IsTrue(p.Damage(999)); driver.Tick(.02f);
+            Assert.AreEqual(10, driver.Pose); Assert.IsTrue(p.Animator.GetBool("Dead"));
+            Assert.IsFalse(p.StartAttack()); Assert.IsFalse(p.StartDodge(Vector3.forward)); Assert.IsFalse(p.Traversal.TryClimb()); Assert.IsFalse(p.Traversal.TryGlide());
+            var position = p.transform.position; p.Traversal.Simulate(.1f, Vector3.forward, Vector2.up, true, false, true, true, true, false); p.AdvanceAction(2);
+            Assert.AreEqual(position, p.transform.position); Assert.AreEqual(PlayerAction.Dead, p.Action);
+            game.Respawn(); Assert.AreEqual(PlayerAction.Move, p.Action); Assert.IsFalse(p.Animator.GetBool("Dead"));
+            yield return null;
+        }
         [UnityTest] public IEnumerator WorldContainsAllLandmarksAndPersistentObjects()
         {
             yield return null; Assert.AreEqual(35, game.World.Enemies.Count); Assert.AreEqual(151, game.World.Interactions.Count); Assert.IsTrue(game.World.Enemies.All(e => e.Agent.isOnNavMesh)); Assert.IsNotNull(Camera.main); Assert.IsNotNull(game.Hud);
