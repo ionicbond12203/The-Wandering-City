@@ -94,6 +94,7 @@ namespace WanderingCity.Tests
         }
         [UnityTest] public IEnumerator MapZoomAndPanOperateWithinViewportBounds()
         {
+            ExplorationRules.Activate(game.State, "base-beacon");
             game.SetMenu(true, "map"); yield return null;
             var map = UnityEngine.Object.FindFirstObjectByType<ExplorationMapInput>(); Assert.IsNotNull(map);
             var input = new UnityEngine.EventSystems.PointerEventData(UnityEngine.EventSystems.EventSystem.current) { position = new Vector2(700, 500), scrollDelta = Vector2.up * 4 };
@@ -101,6 +102,45 @@ namespace WanderingCity.Tests
             input.delta = new Vector2(-10000, 10000); map.OnDrag(input);
             Vector2 size = ((RectTransform)map.transform).rect.size * (map.Content.localScale.x - 1);
             Assert.That(map.Content.anchoredPosition.x, Is.InRange(-size.x, 0)); Assert.That(map.Content.anchoredPosition.y, Is.InRange(0, size.y));
+            map.Content.Find("base-beacon").GetComponent<UnityEngine.UI.Button>().onClick.Invoke();
+            bool detailsShown = false;
+            foreach (var text in UnityEngine.Object.FindObjectsByType<TMPro.TMP_Text>(FindObjectsSortMode.None))
+                detailsShown |= text.text.Contains("归途信标") && text.text.Contains("距离");
+            Assert.IsTrue(detailsShown, "Selecting a discovered marker opens its details");
+            map.Focus(new Vector2(312.5f, 312.5f), 1); Assert.AreEqual(Vector2.zero, map.Content.anchoredPosition);
+            Assert.AreEqual(Vector3.one, map.Content.localScale);
+            map.Focus(new Vector2(0, 0), 999); Assert.AreEqual(8, map.Content.localScale.x);
+            Assert.AreEqual(Vector2.zero, map.Content.anchoredPosition);
+            yield return null;
+            var playerMarker = (RectTransform)map.Content.Find("You");
+            Assert.AreEqual(Vector2.one * .5f, playerMarker.pivot);
+            Assert.AreEqual(.125f, playerMarker.localScale.x, .001f);
+        }
+        [UnityTest] public IEnumerator MinimapUsesDiscoveryAndTracksLivePlayerAndQuest()
+        {
+            var minimap = game.Hud.Minimap;
+            game.State.discoveredPOIIds.Remove("mesa-beacon"); minimap.Refresh();
+            var marker = minimap.transform.Find("Circular clip/mesa-beacon");
+            Assert.IsFalse(marker.gameObject.activeSelf);
+            ExplorationRules.Activate(game.State, "mesa-beacon"); minimap.Refresh(); Assert.IsTrue(marker.gameObject.activeSelf);
+            Position(new Vector3(-200, 1, -100), 90); minimap.Orientation = MinimapOrientation.RotateWithPlayer; minimap.Refresh();
+            Assert.AreEqual(Vector2.zero, minimap.PlayerMarker.anchoredPosition);
+            Assert.AreEqual(0, minimap.PlayerMarker.localEulerAngles.z, .001f);
+            Assert.LessOrEqual(((RectTransform)marker).anchoredPosition.magnitude, 86.001f);
+            game.State.claimed.Add("wood-0"); game.State.claimed.Add("stone-0"); game.State.craftedPotion = true; game.State.placedBuilding = true;
+            minimap.Refresh(); Assert.AreEqual(86, minimap.ObjectiveMarker.anchoredPosition.magnitude, .001f);
+            Assert.IsTrue(minimap.ObjectiveMarker.gameObject.activeSelf);
+            yield return null;
+        }
+        [UnityTest] public IEnumerator HudGroupsStayInsideActualCanvasAndInsetSafeArea()
+        {
+            yield return null; Canvas.ForceUpdateCanvases();
+            var layout = UnityEngine.Object.FindFirstObjectByType<SafeAreaHud>();
+            foreach (var group in layout.Critical) Assert.IsTrue(SafeAreaHud.Inside(group, Screen.safeArea), group.name);
+            var root = (RectTransform)layout.transform;
+            var inset = new Rect(35, 20, Screen.width - 65, Screen.height - 45);
+            SafeAreaHud.Apply(root, inset, new Vector2(Screen.width, Screen.height)); Canvas.ForceUpdateCanvases();
+            foreach (var group in layout.Critical) Assert.IsTrue(SafeAreaHud.Inside(group, inset), group.name);
         }
         [UnityTest] public IEnumerator SprintAccelerationJumpAndDodgeCannotEnterClimb()
         {

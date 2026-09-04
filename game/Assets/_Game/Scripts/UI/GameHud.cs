@@ -15,6 +15,7 @@ namespace WanderingCity
         GameSession session;
         Canvas canvas; RectTransform root, menu;
         CanvasGroup gameplayGroup;
+        public CircularMinimap Minimap { get; private set; }
         TMP_FontAsset font;
         TMP_Text status, objective, prompt, notice, hotbar, location, menuInfo, tutorialHint;
         CanvasGroup tutorialGroup;
@@ -30,52 +31,65 @@ namespace WanderingCity
             session = owner;
             var go = new GameObject("Adventure HUD", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
             canvas = go.GetComponent<Canvas>(); canvas.renderMode = RenderMode.ScreenSpaceOverlay; root = go.GetComponent<RectTransform>();
-            var scale = go.GetComponent<CanvasScaler>(); scale.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize; scale.referenceResolution = new Vector2(1920, 1080); scale.matchWidthOrHeight = .5f;
-            var canvasRoot = root; var gameplay = new GameObject("Gameplay overlay", typeof(RectTransform), typeof(CanvasGroup)); root = Rect(gameplay, canvasRoot, 0, 0, 1920, 1080); gameplayGroup = gameplay.GetComponent<CanvasGroup>(); gameplayGroup.blocksRaycasts = false;
+            var scale = go.GetComponent<CanvasScaler>(); scale.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize; scale.referenceResolution = new Vector2(1920, 1080); scale.screenMatchMode = CanvasScaler.ScreenMatchMode.Expand;
+            var canvasRoot = root;
+            var safe = new GameObject("SafeAreaRoot", typeof(RectTransform), typeof(SafeAreaHud)).GetComponent<RectTransform>();
+            safe.SetParent(canvasRoot, false); SafeAreaHud.Apply(safe, Screen.safeArea, new Vector2(Screen.width, Screen.height));
+            var layout = safe.GetComponent<SafeAreaHud>();
+            var gameplay = new GameObject("Gameplay overlay", typeof(RectTransform), typeof(CanvasGroup));
+            root = Rect(gameplay, safe, 0, 0, 0, 0); Stretch(root); gameplayGroup = gameplay.GetComponent<CanvasGroup>(); gameplayGroup.blocksRaycasts = false;
+            RectTransform Group(string name, Vector2 anchor, Vector2 size, Vector2 offset)
+            {
+                var group = SafeAreaHud.Group(root, name, anchor, size, offset); layout.Critical.Add(group); return group;
+            }
+            var topLeft = Group("TopLeftHud", new Vector2(0, 1), new Vector2(390, 300), new Vector2(40, -36));
+            var topCenter = Group("TopCenterHud", new Vector2(.5f, 1), new Vector2(990, 200), new Vector2(0, -35));
+            var topRight = Group("TopRightHud", Vector2.one, new Vector2(260, 350), new Vector2(-40, -36));
+            var bottomLeft = Group("BottomLeftHud", Vector2.zero, new Vector2(490, 130), new Vector2(60, 30));
+            var bottomCenter = Group("BottomCenterHud", new Vector2(.5f, 0), new Vector2(690, 60), new Vector2(0, 45));
+            var center = Group("CenterHud", Vector2.one * .5f, new Vector2(910, 430), Vector2.zero);
             var osFont = Resources.Load<Font>("Fonts/NotoSansSC");
             font = TMP_FontAsset.CreateFontAsset(osFont, 32, 5, UnityEngine.TextCore.LowLevel.GlyphRenderMode.SDFAA, 2048, 2048, AtlasPopulationMode.Dynamic);
             font.isMultiAtlasTexturesEnabled = true;
             new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
-            Box(root, "Location panel", 40, 36, 390, 105, new Color(.08f, .16f, .17f, .28f));
-            Label(root, "THE WANDERING CITY", 64, 53, 360, 28, 18, gold);
-            location = Label(root, "旅人据点", 64, 84, 355, 46, 30, ivory);
-            Box(root, "Objective panel", 40, 160, 390, 158, new Color(.08f, .16f, .17f, .22f));
-            objective = Label(root, "", 62, 180, 345, 122, 22, ivory);
+            Box(topLeft, "Location panel", 0, 0, 390, 105, new Color(.08f, .16f, .17f, .28f));
+            Label(topLeft, "THE WANDERING CITY", 24, 17, 360, 28, 18, gold);
+            location = Label(topLeft, "旅人据点", 24, 48, 355, 46, 30, ivory);
+            Box(topLeft, "Objective panel", 0, 124, 390, 158, new Color(.08f, .16f, .17f, .22f));
+            objective = Label(topLeft, "", 22, 144, 345, 122, 22, ivory);
 
-            // MiniMap placeholder in top-right
-            Box(root, "MiniMap border", 1730, 36, 150, 150, new Color(.08f, .16f, .17f, .90f));
-            Box(root, "MiniMap center", 1734, 40, 142, 142, new Color(.11f, .18f, .19f, .96f));
-            Label(root, "MINIMAP", 1730, 48, 150, 22, 13, gold, TextAlignmentOptions.Center);
-            Label(root, "◇", 1730, 96, 150, 28, 22, ivory, TextAlignmentOptions.Center);
-            Label(root, "M 全图", 1730, 152, 150, 22, 13, gold, TextAlignmentOptions.Center);
-            if (DevelopmentVisualMode.Enabled) Label(root, "Tab 背包   Esc 暂停", 1430, 45, 280, 36, 19, ivory, TextAlignmentOptions.Right);
-
-            Label(root, "N  /  北方遗迹", 770, 35, 380, 30, 20, gold, TextAlignmentOptions.Center);
-            status = Label(root, "", 60, 924, 490, 45, 22, ivory);
-            Box(root, "HP track", 60, 975, 355, 10, new Color(.12f, .22f, .22f, .9f));
-            health = Box(root, "HP", 60, 975, 355, 10, new Color(.51f, .8f, .6f));
-            Box(root, "Stamina track", 60, 1000, 355, 8, new Color(.12f, .22f, .22f));
-            stamina = Box(root, "Stamina", 60, 1000, 355, 8, new Color(.35f, .79f, .87f));
-            Label(root, "体力", 60, 1017, 100, 28, 16, ivory);
-            hotbar = Label(root, "", 630, 975, 690, 55, 23, ivory, TextAlignmentOptions.Center);
+            var minimapRoot = Rect(new GameObject("Circular minimap", typeof(RectTransform)), topRight, 10, 12, 240, 240);
+            Minimap = minimapRoot.gameObject.AddComponent<CircularMinimap>(); Minimap.Create(session, font);
+            Label(topCenter, "N  /  风息原野", 305, 0, 380, 30, 20, gold, TextAlignmentOptions.Center);
+            status = Label(bottomLeft, "", 0, 0, 490, 45, 22, ivory);
+            Box(bottomLeft, "HP track", 0, 51, 355, 10, new Color(.12f, .22f, .22f, .9f));
+            health = Box(bottomLeft, "HP", 0, 51, 355, 10, new Color(.51f, .8f, .6f));
+            Box(bottomLeft, "Stamina track", 0, 76, 355, 8, new Color(.12f, .22f, .22f));
+            stamina = Box(bottomLeft, "Stamina", 0, 76, 355, 8, new Color(.35f, .79f, .87f));
+            Label(bottomLeft, "体力", 0, 93, 100, 28, 16, ivory);
+            hotbar = Label(bottomCenter, "", 0, 0, 690, 55, 23, ivory, TextAlignmentOptions.Center);
 
             // Contextual tutorial hint with auto-fade
             var tutGo = new GameObject("Contextual Tutorial", typeof(RectTransform), typeof(CanvasGroup));
-            var tutRect = Rect(tutGo, root, 1360, 965, 500, 60);
+            var tutRect = Rect(tutGo, topRight, 0, 290, 260, 60);
             tutorialGroup = tutGo.GetComponent<CanvasGroup>();
-            tutorialHint = Label(tutRect, "WASD 移动 · Space 跳跃 · 左键 攻击", 0, 0, 500, 50, 18, ivory, TextAlignmentOptions.Right);
+            tutorialHint = Label(tutRect, "WASD 移动 · Space 跳跃 · 左键 攻击", 0, 0, 260, 50, 16, ivory, TextAlignmentOptions.Right);
 
-            prompt = Label(root, "", 505, 800, 910, 110, 25, ivory, TextAlignmentOptions.Center);
-            notice = Label(root, "", 465, 170, 990, 90, 25, gold, TextAlignmentOptions.Center);
-            Label(root, "·", 948, 520, 24, 30, 30, ivory, TextAlignmentOptions.Center);
-            damage = Box(root, "Damage", 0, 0, 1920, 1080, Color.clear); damage.raycastTarget = false;
+            prompt = Label(center, "", 0, 320, 910, 110, 25, ivory, TextAlignmentOptions.Center);
+            notice = Label(topCenter, "", 0, 100, 990, 90, 25, gold, TextAlignmentOptions.Center);
+            Label(center, "·", 443, 195, 24, 30, 30, ivory, TextAlignmentOptions.Center);
+            damage = Box(root, "Damage", 0, 0, 1920, 1080, Color.clear); damage.raycastTarget = false; Stretch(damage.rectTransform);
             foreach (var enemy in session.World.Enemies) { var t = Label(root, "", 0, 0, 160, 55, 17, ivory, TextAlignmentOptions.Center); enemyLabels.Add((enemy, t.rectTransform, t)); }
-            menu = Box(canvasRoot, "Menu overlay", 0, 0, 1920, 1080, new Color(.035f, .08f, .09f, .92f)).rectTransform;
+            var menuFrame = SafeAreaHud.Group(safe, "Menu frame", Vector2.one * .5f, new Vector2(1920, 1080), Vector2.zero);
+            menu = Box(menuFrame, "Menu overlay", 0, 0, 1920, 1080, new Color(.035f, .08f, .09f, .92f)).rectTransform;
         }
         public void Flash() { flash = .4f; }
         void Update()
         {
             if (session == null) return;
+            var menuFrame = (RectTransform)menu.parent;
+            var available = ((RectTransform)menuFrame.parent).rect.size;
+            menuFrame.localScale = Vector3.one * Mathf.Min(1, Mathf.Min(available.x / 1920, available.y / 1080));
             gameplayGroup.alpha = session.Paused ? 0 : 1;
             flash = Mathf.Max(0, flash - Time.unscaledDeltaTime); damage.color = new Color(.6f, .08f, .03f, flash * .5f);
             var s = session.State;
@@ -166,19 +180,28 @@ namespace WanderingCity
         }
         void RenderMap()
         {
-            var viewport = Box(menu, "Exploration map viewport", 170, 280, 1050, 625, new Color(.07f, .13f, .15f)).rectTransform;
+            var viewport = Box(menu, "Exploration map viewport", 350, 280, 625, 625, new Color(.07f, .13f, .15f)).rectTransform;
             viewport.gameObject.AddComponent<RectMask2D>();
-            var map = Box(viewport, "Map content", 0, 0, 1050, 625, new Color(.12f, .2f, .2f)).rectTransform;
+            var map = Box(viewport, "Map content", 0, 0, 625, 625, new Color(.12f, .2f, .2f)).rectTransform;
             var navigation = viewport.gameObject.AddComponent<ExplorationMapInput>(); navigation.Content = map;
-            Vector2 Map(Vector3 p) => new Vector2((p.x + 110) / 220 * 1050, 625 - (p.z + 50) / 230 * 625);
+            var mapData = WorldMapData.Load();
+            var terrainImage = new GameObject("World terrain texture", typeof(RectTransform), typeof(RawImage));
+            Rect(terrainImage, map, 0, 0, 625, 625); terrainImage.GetComponent<RawImage>().texture = mapData.Texture; terrainImage.GetComponent<RawImage>().raycastTarget = false;
+            Vector2 Map(Vector3 p) => mapData.WorldToMap(p, map.rect.size);
+            Image MapMarker(string name, Vector2 position, float size, Color color)
+            {
+                var image = Box(map, name, position.x, position.y, size, size, color);
+                image.rectTransform.pivot = Vector2.one * .5f; return image;
+            }
+            var details = Label(menu, "选择地图标记查看详情", 1020, 590, 700, 180, 23, ivory);
             foreach (var region in session.Exploration.Regions)
             {
                 var bounds = region.GetComponent<BoxCollider>().bounds;
                 Vector2 top = Map(new Vector3(bounds.min.x, 0, bounds.max.z));
                 Vector2 bottom = Map(new Vector3(bounds.max.x, 0, bounds.min.z));
                 bool discovered = session.State.discoveredRegionIds.Contains(region.Id);
-                var area = Box(map, region.Id, top.x, top.y, bottom.x - top.x, bottom.y - top.y, discovered ? new Color(.24f, .36f, .3f) : new Color(.06f, .1f, .12f)); area.raycastTarget = false;
-                Label(map, discovered ? region.DisplayName : "未踏足", top.x + 8, top.y + 8, bottom.x - top.x - 10, 32, 16, discovered ? ivory : Color.gray);
+                var area = Box(map, region.Id, top.x, top.y, bottom.x - top.x, bottom.y - top.y, discovered ? new Color(.24f, .36f, .3f, .2f) : new Color(.06f, .1f, .12f, .8f)); area.raycastTarget = false;
+                Label(map, discovered ? region.DisplayName : "未踏足", top.x - 20, top.y - 25, 170, 30, 13, discovered ? ivory : Color.gray);
             }
             // Old MVP regions retain their existing discovery history.
             foreach (var point in new[] { ("forest", new Vector3(-48, 0, 65)), ("quarry", new Vector3(64, 0, 59)), ("ruins", new Vector3(20, 0, 135)), ("camp", Vector3.zero) })
@@ -189,10 +212,12 @@ namespace WanderingCity
             int row = 0;
             foreach (var poi in session.Exploration.Points.Values)
             {
-                if (!session.State.discoveredPOIIds.Contains(poi.Id)) continue;
+                if (!WorldMapData.Visible(session.State, poi.Id)) continue;
                 var p = Map(poi.transform.position);
-                var marker = Box(map, poi.Id, p.x - 5, p.y - 5, 10, 10, poi.Completed ? new Color(.3f, .9f, .85f) : gold); marker.raycastTarget = false;
-                Label(map, poi.DisplayName, p.x + 9, p.y - 6, 180, 36, 14, ivory);
+                var marker = MapMarker(poi.Id, p, 14, poi.Completed ? new Color(.3f, .9f, .85f) : gold); marker.raycastTarget = true;
+                marker.rectTransform.sizeDelta = Vector2.one * 14;
+                var select = marker.gameObject.AddComponent<Button>();
+                select.onClick.AddListener(() => details.text = poi.DisplayName + "\n" + (poi.Type == PoiType.TeleportPoint ? "传送信标" : "兴趣点") + (poi.Completed ? " / 已完成" : " / 已发现") + "\n距离 " + Mathf.RoundToInt(Vector3.Distance(session.Player.transform.position, poi.transform.position)) + " m" + (poi.Type == PoiType.TeleportPoint ? (session.State.activatedTeleportIds.Contains(poi.Id) ? "\n信标已激活，可选择右侧传送按钮。" : "\n靠近信标按 E 激活。") : ""));
                 if (poi.Type == PoiType.TeleportPoint)
                 {
                     string id = poi.Id;
@@ -200,10 +225,15 @@ namespace WanderingCity
                     else Label(menu, poi.DisplayName + " / 待激活", 1280, 430 + row++ * 80, 430, 70, 22, gold);
                 }
             }
-            Vector2 player = Map(session.Player.transform.position); Box(map, "You", player.x - 7, player.y - 7, 14, 14, Color.white).raycastTarget = false;
+            var activeObjective = WorldMapData.ObjectivePosition(session);
+            if (activeObjective.HasValue) { var p = Map(activeObjective.Value); var target = MapMarker("Quest objective", p, 12, gold); target.gameObject.AddComponent<Button>().onClick.AddListener(() => details.text = Rules.Objective(session.State)); }
+            Vector2 player = Map(session.Player.transform.position); MapMarker("You", player, 14, Color.white).raycastTarget = false;
+            navigation.Focus(player, 3);
             Label(menu, "白点 / 旅人   青色 / 已完成\n滚轮缩放 · 拖拽平移\n信标须先靠近并按 E 激活", 1280, 295, 450, 125, 23, ivory);
-            Label(menu, "兴趣点 " + session.State.discoveredPOIIds.Count + "/" + ExplorationCatalog.PoiIds.Count + "\n区域 " + session.State.discoveredRegionIds.Count + "/3\n行旅匣 " + session.State.openedTreasureIds.Count + "/2\n\n登上台地尖塔，俯瞰风隙峡谷。\n两岸的共鸣石守着另一份回响。", 1280, 670, 450, 250, 23, ivory);
+            Label(menu, "兴趣点 " + session.State.discoveredPOIIds.Count + "/" + ExplorationCatalog.PoiIds.Count + "   ·   金色 / 当前目标", 1020, 875, 700, 50, 21, gold);
+            Button(menu, "切换小地图方向", 1020, 780, 700, () => { Minimap.Orientation = Minimap.Orientation == MinimapOrientation.NorthUp ? MinimapOrientation.RotateWithPlayer : MinimapOrientation.NorthUp; details.text = "小地图方向：" + (Minimap.Orientation == MinimapOrientation.NorthUp ? "北向固定" : "跟随旅人旋转"); });
         }
+        static void Stretch(RectTransform rect) { rect.anchorMin = Vector2.zero; rect.anchorMax = Vector2.one; rect.offsetMin = rect.offsetMax = Vector2.zero; }
         RectTransform Rect(GameObject go, Transform parent, float x, float y, float w, float h) { var rect = go.GetComponent<RectTransform>(); rect.SetParent(parent, false); rect.anchorMin = rect.anchorMax = new Vector2(0, 1); rect.pivot = new Vector2(0, 1); rect.anchoredPosition = new Vector2(x, -y); rect.sizeDelta = new Vector2(w, h); return rect; }
         Image Box(Transform parent, string name, float x, float y, float w, float h, Color color) { var go = new GameObject(name, typeof(RectTransform), typeof(Image)); Rect(go, parent, x, y, w, h); var image = go.GetComponent<Image>(); image.color = color; return image; }
         TMP_Text Label(Transform parent, string text, float x, float y, float w, float h, float size, Color color, TextAlignmentOptions alignment = TextAlignmentOptions.TopLeft) { var go = new GameObject("Text", typeof(RectTransform), typeof(TextMeshProUGUI)); Rect(go, parent, x, y, w, h); var tmp = go.GetComponent<TextMeshProUGUI>(); tmp.font = font; tmp.fontSize = size; tmp.color = color; tmp.text = text; tmp.alignment = alignment; tmp.raycastTarget = false; tmp.textWrappingMode = TextWrappingModes.Normal; return tmp; }

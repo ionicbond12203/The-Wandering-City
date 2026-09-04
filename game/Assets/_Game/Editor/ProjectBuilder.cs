@@ -321,6 +321,7 @@ namespace WanderingCity.Editor
         public static void BuildWindows()
         {
             Prepare();
+            WorldMapBaker.Bake();
             Directory.CreateDirectory("Builds/Windows");
             var report = BuildPipeline.BuildPlayer(EditorBuildSettings.scenes, "Builds/Windows/The Wandering City.exe", BuildTarget.StandaloneWindows64, BuildOptions.Development);
             if (report.summary.result != UnityEditor.Build.Reporting.BuildResult.Succeeded)
