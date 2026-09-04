@@ -11,6 +11,12 @@ namespace WanderingCity.Tests.EditMode
 {
     public sealed class VisualVerticalSliceTests
     {
+        [OneTimeSetUp]
+        public void OneTimeSetUp()
+        {
+            ProjectBuilder.Prepare();
+        }
+
         [Test]
         public void Hierarchy_ContainsAllRequiredContainersAndAuthoredElements()
         {
@@ -100,7 +106,7 @@ namespace WanderingCity.Tests.EditMode
                 adapter.Setup(player);
 
                 Assert.IsTrue(adapter.IsFallbackMode, "Adapter should be in fallback mode when fallback flag is true.");
-                Assert.IsNotNull(player.Visual.Find("DebugPrimitives"), "DebugPrimitives container must exist in fallback mode.");
+                Assert.IsNotNull(player.Visual.Find("[PLACEHOLDER] DebugPrimitives"), "[PLACEHOLDER] DebugPrimitives container must exist in fallback mode.");
                 Assert.IsNotNull(player.Blade, "Blade must still exist in fallback mode.");
                 Assert.IsNotNull(player.GlideSail, "GlideSail must still exist in fallback mode.");
             }

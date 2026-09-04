@@ -14,33 +14,66 @@ namespace WanderingCity
         public void Create(GameSession owner, WorldBuilder builder, Transform geometry, Transform worldRoot)
         {
             session = owner; world = builder; root = worldRoot;
-            // New eastern loop, outside the existing resource and combat routes: low 0, mid 6, high 14.
+            // Eastern traversal loop — all Y resolved from GroundY + local structure offset
             Color rock = new Color(.43f, .51f, .48f);
-            var mesa = world.Shape("Echo mesa / climb shortcut", PrimitiveType.Cube, new Vector3(78, 7, 8), new Vector3(22, 14, 22), rock, geometry);
+
+            // Structure dimensions (local offsets above ground)
+            const float mesaHeight = 14f, shelfHeight = 6f;
+
+            float mesaGround = WorldBuilder.GroundY(78, 8, 0);
+            var mesa = world.Shape("[PLACEHOLDER] Echo mesa / climb shortcut", PrimitiveType.Cube,
+                new Vector3(78, mesaGround + mesaHeight * 0.5f, 8), new Vector3(22, mesaHeight, 22), rock, geometry);
             mesa.AddComponent<ClimbSurface>();
-            var shelf = world.Shape("Mid shelf / climbable", PrimitiveType.Cube, new Vector3(51, 3, -8), new Vector3(20, 6, 18), rock, geometry);
+
+            float shelfGround = WorldBuilder.GroundY(51, -8, 0);
+            var shelf = world.Shape("[PLACEHOLDER] Mid shelf / climbable", PrimitiveType.Cube,
+                new Vector3(51, shelfGround + shelfHeight * 0.5f, -8), new Vector3(20, shelfHeight, 18), rock, geometry);
             shelf.AddComponent<ClimbSurface>();
-            // Safe long ramps reach both heights without stamina. Top meets the platforms without a lip.
-            Ramp("Shelf walking approach", new Vector3(27, 3, -8), 30, 6, 8, geometry);
-            Ramp("Mesa walking approach", new Vector3(53, 10, 8), 28, 8, 7, geometry);
-            world.Shape("Shelf connector", PrimitiveType.Cube, new Vector3(46, 3, 4), new Vector3(14, 6, 10), rock, geometry);
-            world.Shape("Split canyon west bank", PrimitiveType.Cube, new Vector3(72, 3, 32), new Vector3(10, 6, 15), rock, geometry).AddComponent<ClimbSurface>();
-            world.Shape("Split canyon east bank", PrimitiveType.Cube, new Vector3(90, 3, 32), new Vector3(10, 6, 15), rock, geometry).AddComponent<ClimbSurface>();
-            world.Shape("Canyon footpath", PrimitiveType.Cube, new Vector3(81, .03f, 32), new Vector3(7, .05f, 19), new Color(.61f, .59f, .4f), root, false);
-            Poi("base-beacon", "归途信标", PoiType.TeleportPoint, new Vector3(8, .8f, 4), 9, new Vector3(8, .15f, 1));
-            Poi("mesa-beacon", "回声台地信标", PoiType.TeleportPoint, new Vector3(77, 14.8f, 8), 10, new Vector3(75, 14.15f, 8));
-            Poi("wind-spire", "听风尖塔", PoiType.Landmark, new Vector3(84, 14, 14), 12);
-            Poi("shelf-cache", "行旅匣 / 常见", PoiType.Treasure, new Vector3(53, 6.8f, -9), 9, tier: TreasureTier.Common);
-            Poi("canyon-cache", "回声匣 / 珍稀", PoiType.Treasure, new Vector3(81, .8f, 35), 7, tier: TreasureTier.Rare);
-            Poi("echo-puzzle", "双石共鸣", PoiType.Puzzle, new Vector3(81, 0, 29), 8);
-            Poi("north-camp", "沉眠守卫营地", PoiType.EnemyCamp, new Vector3(20, 0, 130), 20);
-            Poi("ore-garden", "星砂矿苑", PoiType.ResourceArea, new Vector3(62, 0, 77), 14);
-            Poi("canyon-secret", "风隙小径", PoiType.Secret, new Vector3(81, 0, 24), 5);
+
+            // Safe long ramps reach both heights without stamina
+            Ramp("Shelf walking approach", new Vector3(27, shelfGround + shelfHeight * 0.5f, -8), 30, shelfHeight, 8, geometry);
+            Ramp("Mesa walking approach", new Vector3(53, (shelfGround + shelfHeight + mesaGround + mesaHeight) * 0.5f, 8), 28, (mesaGround + mesaHeight) - (shelfGround + shelfHeight), 7, geometry);
+
+            float connGround = WorldBuilder.GroundY(46, 4, 0);
+            world.Shape("[PLACEHOLDER] Shelf connector", PrimitiveType.Cube, new Vector3(46, connGround + shelfHeight * 0.5f, 4), new Vector3(14, shelfHeight, 10), rock, geometry);
+
+            float westBankGround = WorldBuilder.GroundY(72, 32, 0);
+            world.Shape("[PLACEHOLDER] Split canyon west bank", PrimitiveType.Cube, new Vector3(72, westBankGround + shelfHeight * 0.5f, 32), new Vector3(10, shelfHeight, 15), rock, geometry).AddComponent<ClimbSurface>();
+            float eastBankGround = WorldBuilder.GroundY(90, 32, 0);
+            world.Shape("[PLACEHOLDER] Split canyon east bank", PrimitiveType.Cube, new Vector3(90, eastBankGround + shelfHeight * 0.5f, 32), new Vector3(10, shelfHeight, 15), rock, geometry).AddComponent<ClimbSurface>();
+
+            float canyonGround = WorldBuilder.GroundY(81, 32, 0);
+            world.Shape("[PLACEHOLDER] Canyon footpath", PrimitiveType.Cube, new Vector3(81, canyonGround + 0.03f, 32), new Vector3(7, .05f, 19), new Color(.61f, .59f, .4f), root, false);
+
+            // POIs — Y resolved from GroundY + offset
+            float baseBeaconG = WorldBuilder.GroundY(8, 4, 0);
+            Poi("base-beacon", "归途信标", PoiType.TeleportPoint, new Vector3(8, baseBeaconG + 0.8f, 4), 9, new Vector3(8, baseBeaconG + 0.15f, 1));
+
+            float mesaTopY = mesaGround + mesaHeight;
+            Poi("mesa-beacon", "回声台地信标", PoiType.TeleportPoint, new Vector3(77, mesaTopY + 0.8f, 8), 10, new Vector3(75, mesaTopY + 0.15f, 8));
+            Poi("wind-spire", "听风尖塔", PoiType.Landmark, new Vector3(84, mesaTopY, 14), 12);
+
+            float shelfTopY = shelfGround + shelfHeight;
+            Poi("shelf-cache", "行旅匣 / 常见", PoiType.Treasure, new Vector3(53, shelfTopY + 0.8f, -9), 9, tier: TreasureTier.Common);
+
+            Poi("canyon-cache", "回声匣 / 珍稀", PoiType.Treasure, new Vector3(81, canyonGround + 0.8f, 35), 7, tier: TreasureTier.Rare);
+            Poi("echo-puzzle", "双石共鸣", PoiType.Puzzle, new Vector3(81, canyonGround, 29), 8);
+
+            float campGround = WorldBuilder.GroundY(20, 130, 0);
+            Poi("north-camp", "沉眠守卫营地", PoiType.EnemyCamp, new Vector3(20, campGround, 130), 20);
+            float oreGround = WorldBuilder.GroundY(62, 77, 0);
+            Poi("ore-garden", "星砂矿苑", PoiType.ResourceArea, new Vector3(62, oreGround, 77), 14);
+            float secretGround = WorldBuilder.GroundY(81, 24, 0);
+            Poi("canyon-secret", "风隙小径", PoiType.Secret, new Vector3(81, secretGround, 24), 5);
+
             Puzzle = new GameObject("Echo puzzle controller").AddComponent<PuzzleController>(); Puzzle.transform.SetParent(root); Puzzle.Session = session;
-            AddNode("echo-west", new Vector3(79, .8f, 28)); AddNode("echo-east", new Vector3(83, .8f, 32));
-            Region("wind-meadow", "风息原野", new Vector3(0, 8, 30), new Vector3(110, 30, 125));
-            Region("echo-mesa", "回声台地", new Vector3(64, 12, 3), new Vector3(65, 32, 44));
-            Region("split-canyon", "风隙峡谷", new Vector3(81, 8, 32), new Vector3(28, 22, 19));
+            AddNode("echo-west", new Vector3(79, canyonGround + 0.8f, 28)); AddNode("echo-east", new Vector3(83, canyonGround + 0.8f, 32));
+
+            // Regions — use terrain-relative Y centers with generous vertical bounds
+            float meadowY = WorldBuilder.GroundY(0, 30, 0);
+            Region("wind-meadow", "风息原野", new Vector3(0, meadowY + 15, 30), new Vector3(110, 60, 125));
+            Region("echo-mesa", "回声台地", new Vector3(64, mesaGround + mesaHeight, 3), new Vector3(65, mesaHeight + 20, 44));
+            Region("split-canyon", "风隙峡谷", new Vector3(81, canyonGround + 10, 32), new Vector3(28, 30, 19));
         }
         void Ramp(string name, Vector3 center, float run, float rise, float width, Transform geometry)
         {

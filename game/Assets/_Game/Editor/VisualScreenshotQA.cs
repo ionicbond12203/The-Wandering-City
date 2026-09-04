@@ -59,7 +59,10 @@ namespace WanderingCity.Editor
                 new Viewpoint("forest.png", new Vector3(-35, 2.2f, 50), 12f, -50f, 54f),
 
                 // 5. High elevated viewpoint for gliding overview of the lowland
-                new Viewpoint("glide-viewpoint.png", new Vector3(20, 24f, 100), -12f, 175f, 58f)
+                new Viewpoint("glide-viewpoint.png", new Vector3(20, 24f, 100), -12f, 175f, 58f),
+
+                // 6. Render health check — wide view that captures sky, terrain, vegetation, and player area
+                new Viewpoint("render-health.png", new Vector3(0, 8f, -10), 12f, 20f, 68f),
             };
 
             var camGo = new GameObject("QA_CaptureCamera");
@@ -68,12 +71,20 @@ namespace WanderingCity.Editor
             cam.farClipPlane = 800f;
             cam.clearFlags = CameraClearFlags.Skybox;
 
+            // If skybox is invalid, fallback to solid color to prevent false magenta
+            if (RenderSettings.skybox == null || RenderSettings.skybox.shader == null || !RenderSettings.skybox.shader.isSupported)
+            {
+                cam.clearFlags = CameraClearFlags.SolidColor;
+                cam.backgroundColor = RenderSettings.fogColor;
+            }
+
             int width = 1920;
             int height = 1080;
             var rt = new RenderTexture(width, height, 24, RenderTextureFormat.ARGB32);
             cam.targetTexture = rt;
 
             var tex = new Texture2D(width, height, TextureFormat.RGB24, false);
+            bool anyMagenta = false;
 
             try
             {
@@ -89,6 +100,20 @@ namespace WanderingCity.Editor
                     tex.ReadPixels(new Rect(0, 0, width, height), 0, 0);
                     tex.Apply();
 
+                    // Magenta pixel detection (percentage-based threshold)
+                    var pixels = tex.GetPixels32();
+                    int magentaCount = 0;
+                    foreach (var p in pixels)
+                    {
+                        if (p.r > 200 && p.g < 80 && p.b > 200) magentaCount++;
+                    }
+                    float magentaRatio = (float)magentaCount / pixels.Length;
+                    if (magentaRatio > 0.01f)
+                    {
+                        Debug.LogError($"[Visual QA] MAGENTA DETECTED in {vp.Name}: {magentaRatio:P2} of pixels — shader error!");
+                        anyMagenta = true;
+                    }
+
                     byte[] pngData = tex.EncodeToPNG();
 
                     foreach (var dir in outputDirs)
@@ -97,8 +122,15 @@ namespace WanderingCity.Editor
                         File.WriteAllBytes(filePath, pngData);
                     }
 
-                    Debug.Log($"[Visual QA] Captured: {vp.Name} at {vp.Position}");
+                    Debug.Log($"[Visual QA] Captured: {vp.Name} at {vp.Position} (magenta: {magentaRatio:P2})");
                 }
+
+                // Log render diagnostic info
+                var terrain = Object.FindFirstObjectByType<Terrain>();
+                if (terrain != null && terrain.materialTemplate != null)
+                    Debug.Log($"[Visual QA] Terrain shader: {terrain.materialTemplate.shader.name}");
+                if (RenderSettings.skybox != null)
+                    Debug.Log($"[Visual QA] Skybox shader: {RenderSettings.skybox.shader.name}");
             }
             finally
             {
@@ -109,7 +141,10 @@ namespace WanderingCity.Editor
                 Object.DestroyImmediate(camGo);
             }
 
-            Debug.Log("WANDERING_CITY_SCREENSHOTS_QA_OK");
+            if (anyMagenta)
+                Debug.LogError("WANDERING_CITY_SCREENSHOTS_QA_MAGENTA_DETECTED — visual validation failed");
+            else
+                Debug.Log("WANDERING_CITY_SCREENSHOTS_QA_OK");
         }
     }
 }

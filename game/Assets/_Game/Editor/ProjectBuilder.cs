@@ -179,6 +179,14 @@ namespace WanderingCity.Editor
             var mats = EnvironmentAuthoring.GenerateMaterials();
             EnvironmentAuthoring.PopulateSceneEnvironment(env, terrain, mats);
 
+            // Harden terrain material: ensure persistent asset is assigned
+            if (terrain != null)
+            {
+                var terrainMat = mats.ContainsKey("Terrain") ? mats["Terrain"] 
+                    : AssetDatabase.LoadAssetAtPath<Material>("Assets/_Game/Art/Materials/StylizedTerrain.mat");
+                if (terrainMat != null) terrain.materialTemplate = terrainMat;
+            }
+
             // 2. Lighting root
             var lighting = GameObject.Find("Lighting");
             if (lighting == null) lighting = new GameObject("Lighting");
@@ -228,6 +236,11 @@ namespace WanderingCity.Editor
             RenderSettings.ambientEquatorColor = new Color(0.55f, 0.65f, 0.58f);
             RenderSettings.ambientGroundColor = new Color(0.35f, 0.38f, 0.32f);
             RenderSettings.subtractiveShadowColor = new Color(0.42f, 0.45f, 0.55f);
+
+            // Explicit skybox assignment — harden against missing/invalid default
+            var skyMat = mats.ContainsKey("Sky") ? mats["Sky"]
+                : AssetDatabase.LoadAssetAtPath<Material>("Assets/_Game/Art/Materials/OutdoorSky.mat");
+            if (skyMat != null) RenderSettings.skybox = skyMat;
 
             // 3. Navigation root with NavMeshSurface
             var nav = GameObject.Find("Navigation");

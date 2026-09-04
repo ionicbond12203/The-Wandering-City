@@ -214,6 +214,38 @@ namespace WanderingCity.Editor
             }
             dict["Character"] = matChar;
 
+            // 10. Terrain material — persistent asset, NOT a runtime material
+            string terrainMatPath = MaterialsDir + "/StylizedTerrain.mat";
+            var matTerrain = AssetDatabase.LoadAssetAtPath<Material>(terrainMatPath);
+            if (matTerrain == null)
+            {
+                var terrainShader = Shader.Find("Universal Render Pipeline/Terrain/Lit");
+                matTerrain = new Material(terrainShader);
+                matTerrain.name = "StylizedTerrain";
+                matTerrain.enableInstancing = true;
+                AssetDatabase.CreateAsset(matTerrain, terrainMatPath);
+            }
+            dict["Terrain"] = matTerrain;
+
+            // 11. Skybox material — persistent asset for explicit skybox configuration
+            string skyMatPath = MaterialsDir + "/OutdoorSky.mat";
+            var matSky = AssetDatabase.LoadAssetAtPath<Material>(skyMatPath);
+            if (matSky == null)
+            {
+                var skyShader = Shader.Find("Skybox/Procedural");
+                matSky = new Material(skyShader);
+                matSky.name = "OutdoorSky";
+                matSky.SetFloat("_SunDisk", 2); // High quality sun disk
+                matSky.SetFloat("_SunSize", 0.04f);
+                matSky.SetFloat("_SunSizeConvergence", 5f);
+                matSky.SetFloat("_AtmosphereThickness", 1.05f);
+                matSky.SetColor("_SkyTint", new Color(0.52f, 0.65f, 0.82f));
+                matSky.SetColor("_GroundColor", new Color(0.37f, 0.42f, 0.35f));
+                matSky.SetFloat("_Exposure", 1.25f);
+                AssetDatabase.CreateAsset(matSky, skyMatPath);
+            }
+            dict["Sky"] = matSky;
+
             AssetDatabase.SaveAssets();
             return dict;
         }
@@ -868,10 +900,25 @@ namespace WanderingCity.Editor
             return layers;
         }
 
+        // Terrain data version. Increment to force one-time regeneration after height model changes.
+        // v4 = stable flat lowland corridor (<0.04m) with perimeter mountain ranges.
+        const int TerrainDataVersion = 4;
+        const string TerrainVersionKey = "WanderingCity_TerrainDataVersion";
+
         public static TerrainData GenerateTerrainData(TerrainLayer[] layers)
         {
             var terrainData = AssetDatabase.LoadAssetAtPath<TerrainData>(TerrainDataPath);
-            if (terrainData != null) return terrainData;
+            int storedVersion = EditorPrefs.GetInt(TerrainVersionKey, 0);
+
+            if (terrainData != null && storedVersion >= TerrainDataVersion && terrainData.size.y == 100f)
+                return terrainData;
+
+            // One-time regeneration: delete stale data if version mismatch or wrong height dimension
+            if (terrainData != null && (storedVersion < TerrainDataVersion || terrainData.size.y != 100f))
+            {
+                AssetDatabase.DeleteAsset(TerrainDataPath);
+                terrainData = null;
+            }
 
             terrainData = new TerrainData();
             terrainData.name = "WorldTerrainData";
@@ -935,6 +982,7 @@ namespace WanderingCity.Editor
             terrainData.SetAlphamaps(0, 0, alphas);
 
             AssetDatabase.CreateAsset(terrainData, TerrainDataPath);
+            EditorPrefs.SetInt(TerrainVersionKey, TerrainDataVersion);
             AssetDatabase.SaveAssets();
             return terrainData;
         }
@@ -994,7 +1042,28 @@ namespace WanderingCity.Editor
 
         public static void CreateAuthoredEnvironmentPrefab(TerrainData terrainData)
         {
-            if (File.Exists(AuthoredEnvPrefabPath)) return;
+            // Check if existing prefab has a valid terrain material reference.
+            // If m_MaterialTemplate is {fileID: 0}, delete and regenerate.
+            if (File.Exists(AuthoredEnvPrefabPath))
+            {
+                var existingPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(AuthoredEnvPrefabPath);
+                if (existingPrefab != null)
+                {
+                    var existingTerrain = existingPrefab.GetComponentInChildren<Terrain>();
+                    if (existingTerrain != null && existingTerrain.materialTemplate != null)
+                        return; // Prefab is valid, keep it
+                }
+                // Prefab exists but terrain material is null — delete and regenerate
+                AssetDatabase.DeleteAsset(AuthoredEnvPrefabPath);
+            }
+
+            // Load the persistent terrain material — MUST exist as an asset, never runtime
+            var terrainMat = AssetDatabase.LoadAssetAtPath<Material>(MaterialsDir + "/StylizedTerrain.mat");
+            if (terrainMat == null)
+            {
+                Debug.LogError("StylizedTerrain.mat not found! GenerateMaterials() must be called first.");
+                return;
+            }
 
             var envRoot = new GameObject("Environment");
             var terrainGo = new GameObject("Terrain");
@@ -1003,8 +1072,7 @@ namespace WanderingCity.Editor
 
             var terrain = terrainGo.AddComponent<Terrain>();
             terrain.terrainData = terrainData;
-            terrain.materialTemplate = AssetDatabase.LoadAssetAtPath<Material>("Assets/_Game/Art/Materials/StylizedTerrain.mat") 
-                ?? new Material(Shader.Find("Universal Render Pipeline/Terrain/Lit"));
+            terrain.materialTemplate = terrainMat; // Persistent asset reference — serializes correctly
             terrain.shadowCastingMode = ShadowCastingMode.On;
 
             var collider = terrainGo.AddComponent<TerrainCollider>();

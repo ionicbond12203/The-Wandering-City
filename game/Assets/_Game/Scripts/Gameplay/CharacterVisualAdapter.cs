@@ -108,7 +108,7 @@ namespace WanderingCity
 
         void CreateStylizedTraveler(Transform root)
         {
-            var charRoot = new GameObject("StylizedAdventurer");
+            var charRoot = new GameObject("[PLACEHOLDER] StylizedAdventurer");
             charRoot.transform.SetParent(root, false);
 
             Material charMat = Resources.Load<Material>("StylizedCharacterMat");
@@ -210,7 +210,7 @@ namespace WanderingCity
 
         void CreateDebugPrimitives(Transform root)
         {
-            var debugRoot = new GameObject("DebugPrimitives");
+            var debugRoot = new GameObject("[PLACEHOLDER] DebugPrimitives");
             debugRoot.transform.SetParent(root, false);
 
             var coatMat = new Material(Shader.Find("Universal Render Pipeline/Lit"));

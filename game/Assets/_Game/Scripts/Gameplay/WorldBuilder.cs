@@ -81,6 +81,23 @@ namespace WanderingCity
                     sunGo.transform.rotation = Quaternion.Euler(48, -35, 0);
                     sunGo.transform.SetParent(worldRoot);
                 }
+
+                // Explicit skybox assignment — harden against missing/invalid default
+                var skyMat = Resources.Load<Material>("OutdoorSky");
+                if (skyMat == null) skyMat = UnityEngine.Rendering.GraphicsSettings.defaultRenderPipeline != null
+                    ? null : null; // No runtime fallback — if asset missing, sky relies on scene defaults
+                // Try loading from art materials path via asset reference
+                // Note: Resources.Load only works for assets in Resources folders
+                if (RenderSettings.skybox == null || RenderSettings.skybox.shader == null || !RenderSettings.skybox.shader.isSupported)
+                {
+                    // Ensure camera uses solid color as safety fallback
+                    var mainCam = Camera.main;
+                    if (mainCam != null)
+                    {
+                        mainCam.clearFlags = CameraClearFlags.SolidColor;
+                        mainCam.backgroundColor = RenderSettings.fogColor;
+                    }
+                }
             }
             else
             {
@@ -95,19 +112,23 @@ namespace WanderingCity
                 sun.intensity = 1.6f; 
                 sun.shadows = LightShadows.Soft; 
                 sun.transform.rotation = Quaternion.Euler(48, -35, 0);
-                Shape("Meadow", PrimitiveType.Cube, new Vector3(0, -.5f, 65), new Vector3(220, 1, 230), new Color(.34f, .48f, .32f), terrainRoot);
+                Shape("[PLACEHOLDER] Meadow", PrimitiveType.Cube, new Vector3(0, -.5f, 65), new Vector3(220, 1, 230), new Color(.34f, .48f, .32f), terrainRoot);
                 Path(new Vector3(0, .025f, 4), new Vector3(-46, .025f, 62)); 
                 Path(new Vector3(0, .025f, 4), new Vector3(61, .025f, 57)); 
                 Path(new Vector3(-46, .025f, 62), new Vector3(20, .025f, 128)); 
                 Path(new Vector3(61, .025f, 57), new Vector3(20, .025f, 128));
-                Shape("West boundary", PrimitiveType.Cube, new Vector3(-110, 8, 65), new Vector3(2, 16, 230), new Color(.35f, .43f, .4f), terrainRoot);
-                Shape("East boundary", PrimitiveType.Cube, new Vector3(110, 8, 65), new Vector3(2, 16, 230), new Color(.35f, .43f, .4f), terrainRoot);
-                Shape("North boundary", PrimitiveType.Cube, new Vector3(0, 8, 179), new Vector3(220, 16, 2), new Color(.35f, .43f, .4f), terrainRoot);
-                Shape("South boundary", PrimitiveType.Cube, new Vector3(0, 8, -49), new Vector3(220, 16, 2), new Color(.35f, .43f, .4f), terrainRoot);
+                Shape("[PLACEHOLDER] West boundary", PrimitiveType.Cube, new Vector3(-110, 8, 65), new Vector3(2, 16, 230), new Color(.35f, .43f, .4f), terrainRoot);
+                Shape("[PLACEHOLDER] East boundary", PrimitiveType.Cube, new Vector3(110, 8, 65), new Vector3(2, 16, 230), new Color(.35f, .43f, .4f), terrainRoot);
+                Shape("[PLACEHOLDER] North boundary", PrimitiveType.Cube, new Vector3(0, 8, 179), new Vector3(220, 16, 2), new Color(.35f, .43f, .4f), terrainRoot);
+                Shape("[PLACEHOLDER] South boundary", PrimitiveType.Cube, new Vector3(0, 8, -49), new Vector3(220, 16, 2), new Color(.35f, .43f, .4f), terrainRoot);
                 var rng = new System.Random(8317);
                 for (int i = 0; i < 105; i++) { float x = -85 + (float)rng.NextDouble() * 75, z = 26 + (float)rng.NextDouble() * 86; if (Vector2.Distance(new Vector2(x, z), new Vector2(-48, 65)) < 7) continue; Tree(new Vector3(x, 0, z), 3 + (float)rng.NextDouble() * 4); }
                 for (int i = 0; i < 30; i++) { float a = i * .7f; Rock(new Vector3(64 + Mathf.Cos(a) * (12 + i % 4 * 3), 1, 57 + Mathf.Sin(a) * (12 + i % 3 * 4)), 2 + i % 4); }
                 for (int i = 0; i < 24; i++) { float a = i / 24f * Mathf.PI * 2; Vector3 p = new Vector3(Mathf.Cos(a) * 120, 5, 65 + Mathf.Sin(a) * 130); Rock(p, 16 + i % 4 * 4); }
+
+                // Fallback camera: explicit solid color, do not rely on default skybox
+                // Camera is created later in CreatePlayer, this ensures RenderSettings won't cause magenta
+                RenderSettings.skybox = null;
             }
 
             // Grounded positions for interactive and gameplay items
@@ -223,13 +244,13 @@ namespace WanderingCity
 
         void Tree(Vector3 p, float h) 
         { 
-            Shape("Tree trunk", PrimitiveType.Cylinder, p + Vector3.up * h * .4f, new Vector3(.65f, h * .4f, .65f), new Color(.28f, .27f, .2f), terrainRoot); 
-            Shape("Canopy", PrimitiveType.Sphere, p + Vector3.up * h, new Vector3(h * .75f, h * .85f, h * .75f), new Color(.25f, .4f + h * .015f, .29f), worldRoot, false); 
+            Shape("[PLACEHOLDER] Tree trunk", PrimitiveType.Cylinder, p + Vector3.up * h * .4f, new Vector3(.65f, h * .4f, .65f), new Color(.28f, .27f, .2f), terrainRoot); 
+            Shape("[PLACEHOLDER] Canopy", PrimitiveType.Sphere, p + Vector3.up * h, new Vector3(h * .75f, h * .85f, h * .75f), new Color(.25f, .4f + h * .015f, .29f), worldRoot, false); 
         }
 
         void Rock(Vector3 p, float size) 
         { 
-            var r = Shape("Weathered stone", PrimitiveType.Cube, p, new Vector3(size, size * .8f, size * .8f), new Color(.41f, .47f, .46f), terrainRoot); 
+            var r = Shape("[PLACEHOLDER] Weathered stone", PrimitiveType.Cube, p, new Vector3(size, size * .8f, size * .8f), new Color(.41f, .47f, .46f), terrainRoot); 
             r.transform.rotation = Quaternion.Euler(0, p.x * 3, 12); 
         }
 
@@ -291,7 +312,12 @@ namespace WanderingCity
             var cam = cameraObject.AddComponent<Camera>(); 
             cam.fieldOfView = 58; 
             cam.farClipPlane = 320; 
-            cam.backgroundColor = RenderSettings.fogColor; 
+            cam.backgroundColor = RenderSettings.fogColor;
+            // Explicit camera clear mode: if skybox is valid use it, otherwise solid color
+            if (RenderSettings.skybox != null && RenderSettings.skybox.shader != null && RenderSettings.skybox.shader.isSupported)
+                cam.clearFlags = CameraClearFlags.Skybox;
+            else
+                cam.clearFlags = CameraClearFlags.SolidColor;
             cameraObject.AddComponent<AudioListener>();
             var orbit = cameraObject.AddComponent<OrbitCamera>(); 
             orbit.Target = go.transform; 
