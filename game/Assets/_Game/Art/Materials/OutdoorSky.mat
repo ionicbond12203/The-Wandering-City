@@ -31,6 +31,7 @@ Material:
     - _Coverage: 0.4
     - _Exposure: 1.25
     - _Haze: 0.28
+    - _Rain: 0
     - _Softness: 0.16
     - _SunDisk: 2
     - _SunSize: 0.04

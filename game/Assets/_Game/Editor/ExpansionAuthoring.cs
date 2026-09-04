@@ -8,7 +8,8 @@ namespace WanderingCity.Editor
     {
         public static void Populate(GameObject environment,Dictionary<string,Material> materials)
         {
-            if(environment.transform.Find("ExpandedRegions_v1")!=null)return;
+            var existing = environment.transform.Find("ExpandedRegions_v1");
+            if (existing != null) { GroundPondDecorations(existing); return; }
             var root=new GameObject("ExpandedRegions_v1").transform;root.SetParent(environment.transform);
             foreach(var region in ExpansionCatalog.Regions)
             {
@@ -28,6 +29,18 @@ namespace WanderingCity.Editor
                     go.transform.localScale=Vector3.one*scale;
                 }
             }
+            GroundPondDecorations(root);
+        }
+        static void GroundPondDecorations(Transform root)
+        {
+            foreach (Transform region in root)
+                for (int i = region.childCount - 1; i >= 0; i--)
+                {
+                    var decoration = region.GetChild(i); var p = decoration.position;
+                    float distance = WaterBody.Distance(p.x, p.z);
+                    if (distance < 1.12f) Object.DestroyImmediate(decoration.gameObject);
+                    else if (distance < 1.4f) decoration.position = WorldBuilder.GroundPoint(p.x, p.z);
+                }
         }
     }
 }

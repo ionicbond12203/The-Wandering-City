@@ -37,7 +37,7 @@ namespace WanderingCity
             h = Pad(h,x,z,51,-8,16,5);
             h = Pad(h,x,z,78,8,17,5);
             h = Pad(h,x,z,81,32,14,5);
-            return Mathf.Clamp(ExpansionCatalog.ShapeTerrain(x,z,h), .4f, 148);
+            return Mathf.Clamp(WaterBody.ShapeTerrain(x,z,ExpansionCatalog.ShapeTerrain(x,z,h)), .4f, 148);
         }
         public static float RoadDistance(Vector2 p)
         {

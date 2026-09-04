@@ -13,6 +13,7 @@ namespace WanderingCity
         public void Interact()
         {
             if (!Session.Started || Session.Paused || !Session.Player.CanAct || Session.State.hp <= 0 || !Available || Vector3.Distance(transform.position, Session.Player.transform.position + Vector3.up) > 3.6f || !CombatVisibility.Clear(Session.Player.transform.position + Vector3.up, transform.position)) return;
+            Session.Audio?.Play(WorldSound.Interaction);
             if (Exploration != null)
             {
                 if (Exploration.Type == PoiType.TeleportPoint) Session.Result(ExplorationRules.Activate(Session.State, Id), "信标已激活 / 在地图中选择传送", "信标已激活");

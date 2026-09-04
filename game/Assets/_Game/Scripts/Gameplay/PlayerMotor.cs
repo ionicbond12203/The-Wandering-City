@@ -77,14 +77,14 @@ namespace WanderingCity
             if (!Session.Started || Session.Paused || Session.State.hp <= 0) return false;
             if (ComboWindow && AttackIndex < 3) { comboQueued = true; return true; }
             if (!CanAct) return false;
-            Action = PlayerAction.Attack; AttackIndex = 1; actionTime = 0; comboQueued = false; hit.Clear(); Session.Tone(.8f); return true;
+            Action = PlayerAction.Attack; AttackIndex = 1; actionTime = 0; comboQueued = false; hit.Clear(); Session.Audio?.Play(WorldSound.Attack); return true;
         }
         public bool StartDodge(Vector3 direction)
         {
             // Only recovery can be cancelled; windup and active-hit frames remain committed.
             if (!Session.Started || Session.Paused || (!CanAct && !ComboWindow) || dodgeCooldown > 0 || Session.State.hp <= 0) return false;
             Action = PlayerAction.Dodge; comboQueued = false; actionTime = 0; dodgeCooldown = Session.Balance.dodgeCooldown;
-            dodgeDirection = direction.sqrMagnitude > .1f ? direction.normalized : transform.forward; Session.Tone(.7f); return true;
+            dodgeDirection = direction.sqrMagnitude > .1f ? direction.normalized : transform.forward; Session.Audio?.Play(WorldSound.Traversal); return true;
         }
         public void Strike()
         {
@@ -97,7 +97,7 @@ namespace WanderingCity
         public bool Damage(int amount)
         {
             if (amount <= 0 || Action == PlayerAction.Dead || Invulnerable || Session.State.hp <= 0) return false;
-            Session.State.hp = Mathf.Max(0, Session.State.hp - amount); Session.Hud.Flash(); Session.Tone(.45f);
+            Session.State.hp = Mathf.Max(0, Session.State.hp - amount); Session.Hud.Flash(); Session.Audio?.Play(WorldSound.Hit);
             comboQueued = false; Action = Session.State.hp == 0 ? PlayerAction.Dead : PlayerAction.Hurt; actionTime = 0; Blade.localRotation = Quaternion.identity;
             Traversal?.Interrupt();
             if (GlideSail != null) GlideSail.gameObject.SetActive(false);

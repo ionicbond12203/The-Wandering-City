@@ -50,7 +50,7 @@ namespace WanderingCity
         public void Damage(int amount)
         {
             if (Action == EnemyAction.Dead || amount <= 0) return;
-            Hp = Mathf.Max(0, Hp - amount); flash = .15f; Session.Tone(1.7f);
+            Hp = Mathf.Max(0, Hp - amount); flash = .15f; Session.Audio?.Play(WorldSound.Hit, 1.3f);
             WorldBuilder.Pulse(transform.position + Vector3.up, new Color(1, .8f, .35f));
             if (Hp == 0) { Action = EnemyAction.Dead; Session.State.defeated.Add(Id); Session.World.SpawnDrop(Id, Home); gameObject.SetActive(false); Session.World.RefreshRewards(); Session.Save(); }
             else if (Action != EnemyAction.Attack) Action = EnemyAction.Chase;

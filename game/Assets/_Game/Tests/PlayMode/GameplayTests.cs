@@ -27,6 +27,44 @@ namespace WanderingCity.Tests
             SceneManager.SetActiveScene(previous); yield return SceneManager.UnloadSceneAsync(scene); GameSession.SavePathOverride = null; if (Directory.Exists(folder)) Directory.Delete(folder, true);
         }
         void Teleport(Vector3 p) { game.State.x = p.x; game.State.y = p.y; game.State.z = p.z; game.Player.RestorePosition(); Physics.SyncTransforms(); }
+        [UnityTest] public IEnumerator EmptyMusicSlotsPauseAndMuteRemainSafe()
+        {
+            var audio = game.Audio; Assert.IsNotNull(audio); Assert.IsNotNull(audio.Mixer);
+            Assert.AreEqual(0, audio.Library.Meadow.Length); audio.Tick(4); audio.Tick(3);
+            Assert.AreEqual(0, audio.MusicStarts); Assert.IsTrue(audio.MusicSources.All(s => s.clip == null));
+            game.SetMenu(true); audio.Tick(.1f); Assert.AreEqual("Paused", audio.State.Snapshot);
+            audio.Preferences.Master = 0; audio.Tick(.1f);
+            Assert.IsTrue(audio.GetComponentsInChildren<AudioSource>().All(s => s.volume == 0));
+            Assert.IsTrue(audio.SavePreferences()); var restored = AudioPreferences.Load(audio.PreferencesPath); Assert.AreEqual(0, restored.Master);
+            game.SetMenu(false); game.Begin(true); Assert.AreEqual(0, audio.Preferences.Master);
+            yield return null;
+        }
+        [UnityTest] public IEnumerator LicensedSlotReplacementCrossfadesAndRoutesToMixer()
+        {
+            var audio = game.Audio; audio.enabled = false; var library = ScriptableObject.CreateInstance<WorldAudioLibrary>();
+            var first = AudioClip.Create("QA-only silent score A", 441000, 1, 44100, false);
+            var second = AudioClip.Create("QA-only silent score B", 441000, 1, 44100, false);
+            try
+            {
+                audio.Tick(4); library.Meadow = new[] { first }; library.Forest = new[] { second }; audio.ReloadLibrary(library);
+                audio.Tick(.01f); audio.Tick(2); Assert.GreaterOrEqual(audio.MusicStarts, 1);
+                var a = audio.MusicSources.First(s => s.clip == first); Assert.Greater(a.volume, 0); Assert.AreEqual("Music", a.outputAudioMixerGroup.name);
+                Teleport(WorldBuilder.GroundPoint(-275, 45, .15f)); for (int i = 0; i < 31; i++) audio.Tick(.1f); audio.Tick(.6f);
+                var b = audio.MusicSources.First(s => s.clip == second); Assert.Greater(b.volume, 0); Assert.Greater(a.volume, 0);
+                audio.Tick(2.1f); Assert.AreEqual(0, a.volume); Assert.Greater(b.volume, 0);
+            }
+            finally { foreach (var source in audio.MusicSources) { source.Stop(); source.clip = null; } UnityEngine.Object.Destroy(library); UnityEngine.Object.Destroy(first); UnityEngine.Object.Destroy(second); }
+            yield return null;
+        }
+        [UnityTest] public IEnumerator RainWeatherConnectsSkyLightParticlesAndAudio()
+        {
+            var weather = game.Weather; weather.Automatic = false; weather.Request(WeatherKind.LightRain); weather.Tick(20); game.Audio.Tick(.2f);
+            Assert.AreEqual(1, weather.Weather.Weights.z, .001f); Assert.AreEqual(1, game.Audio.RainAmount, .001f);
+            Assert.Greater(RenderSettings.fogDensity, .002f); Assert.Greater(weather.Rain.emission.rateOverTime.constant, 0);
+            Assert.AreEqual(700, weather.Rain.main.maxParticles); Assert.IsNotNull(game.GetComponentInChildren<WaterBody>());
+            weather.Request(WeatherKind.Clear); weather.Tick(20); Assert.AreEqual(0, weather.Rain.emission.rateOverTime.constant);
+            yield return null;
+        }
         [UnityTest] public IEnumerator CharacterDriverFollowsTraversalAndMeasuredDisplacement()
         {
             var p = game.Player; p.enabled = false; var driver = p.VisualAdapter.Driver; driver.enabled = false;

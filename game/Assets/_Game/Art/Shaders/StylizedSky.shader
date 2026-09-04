@@ -7,6 +7,7 @@ Shader "WanderingCity/StylizedSky"
   _Coverage("Cloud coverage",Range(0,1))=.53
   _Softness("Cloud softness",Range(.01,.5))=.12
   _CloudSpeed("Cloud movement",Float)=.008
+  _Rain("Rain cloud tint",Range(0,1))=0
   _Exposure("Exposure",Float)=1
  }
  SubShader {
@@ -18,7 +19,7 @@ Shader "WanderingCity/StylizedSky"
    #pragma fragment frag
    #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
    #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
-   float4 _Zenith,_Horizon; float _Haze,_Coverage,_Softness,_CloudSpeed,_Exposure;
+   float4 _Zenith,_Horizon; float _Haze,_Coverage,_Softness,_CloudSpeed,_Exposure,_Rain;
    struct V {float4 position:SV_POSITION; float3 direction:TEXCOORD0;};
    V vert(float4 p:POSITION) {V o;o.position=TransformObjectToHClip(p.xyz);o.direction=p.xyz;return o;}
    float hash(float2 p){return frac(sin(dot(p,float2(127.1,311.7)))*43758.5453);}
@@ -33,6 +34,7 @@ Shader "WanderingCity/StylizedSky"
     float n=noise(p)*.58+noise(p*2.1)*.28+noise(p*4.3)*.14;
     float cloud=smoothstep(1-_Coverage-_Softness,1-_Coverage+_Softness,n)*smoothstep(.015,.18,d.y);
     float3 cloudColor=lerp(float3(.52,.65,.76),float3(1,.96,.85),smoothstep(.35,.8,n));
+    cloudColor=lerp(cloudColor,float3(.43,.51,.57),_Rain*.6);
     col=lerp(col,cloudColor,cloud*.9);
     return half4(col*_Exposure,1);
    }

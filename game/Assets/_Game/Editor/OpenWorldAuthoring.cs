@@ -90,7 +90,7 @@ namespace WanderingCity.Editor
             }
             bool resetDetails=data.detailScatterMode!=DetailScatterMode.InstanceCountMode;
             if(resetDetails) data.SetDetailScatterMode(DetailScatterMode.InstanceCountMode);
-            if(data.detailPrototypes.Length!=4 || resetDetails || !System.IO.File.Exists("Assets/_Game/Art/Environment/ExpandedDetails_v2.txt"))
+            if(data.detailPrototypes.Length!=4 || resetDetails || !System.IO.File.Exists("Assets/_Game/Art/Environment/ExpandedDetails_v3.txt"))
             {
                 data.SetDetailResolution(1024,32);data.detailPrototypes=prototypes;
                 for(int k=0;k<4;k++)
@@ -106,7 +106,7 @@ namespace WanderingCity.Editor
                     data.SetDetailLayer(0,0,k,density);
                 }
             }
-            System.IO.File.WriteAllText("Assets/_Game/Art/Environment/ExpandedDetails_v2.txt", "Region grass coverage v2");
+            System.IO.File.WriteAllText("Assets/_Game/Art/Environment/ExpandedDetails_v3.txt", "Region grass coverage v2");
             Traveler(mats);
             EditorUtility.SetDirty(data);AssetDatabase.SaveAssets();
         }
@@ -124,7 +124,7 @@ namespace WanderingCity.Editor
             if(TerrainHeightModel.RoadDistance(new Vector2(x,z))<2.8f) return false;
             if(x>-16&&x<14&&z>-8&&z<12) return false;
             if(x>24&&x<100&&z>-23&&z<44) return false;
-            if(TerrainHeightModel.ValleyMask(x,z)>.85f) return false;
+            if(TerrainHeightModel.ValleyMask(x,z)>.85f || WaterBody.Distance(x,z) < 1.12f) return false;
             foreach(var p in new[]{new Vector2(-48,65),new Vector2(64,59),new Vector2(20,139),new Vector2(-69,94),new Vector2(81,86),new Vector2(-5,103)})
                 if(Vector2.Distance(new Vector2(x,z),p)<4) return false;
             return true;

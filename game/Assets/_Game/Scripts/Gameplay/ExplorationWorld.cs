@@ -133,7 +133,7 @@ namespace WanderingCity
             destination = floor.point + Vector3.up * .1f;
             if (!player.Traversal.SafeStandingPosition(destination)) { session.Notify("传送落点被阻挡"); return false; }
             session.State.x = destination.x; session.State.y = destination.y; session.State.z = destination.z;
-            player.RestorePosition(); world.ResetEnemies(); session.ExitBuilding(); session.Target = null; session.SetMenu(false); session.Save(); session.Notify("循信标返回 / " + point.DisplayName); return true;
+            player.RestorePosition(); world.ResetEnemies(); session.ExitBuilding(); session.Target = null; session.SetMenu(false); session.Save(); session.Audio?.Play(WorldSound.Teleport); session.Notify("循信标返回 / " + point.DisplayName); return true;
         }
         public void Restore()
         {

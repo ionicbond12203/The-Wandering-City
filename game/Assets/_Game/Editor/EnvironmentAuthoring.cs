@@ -913,10 +913,10 @@ namespace WanderingCity.Editor
         public static TerrainData GenerateTerrainData(TerrainLayer[] layers)
         {
             var terrainData = AssetDatabase.LoadAssetAtPath<TerrainData>(TerrainDataPath);
-            if (terrainData != null && terrainData.name == "OpenWorld_v9_Content") return terrainData;
+            if (terrainData != null && terrainData.name == "OpenWorld_v10_Pond") return terrainData;
             bool create = terrainData == null;
             if (create) terrainData = new TerrainData();
-            terrainData.name = "OpenWorld_v9_Content";
+            terrainData.name = "OpenWorld_v10_Pond";
             int res = TerrainHeightModel.Resolution;
             terrainData.heightmapResolution = res;
             terrainData.size = new Vector3(TerrainHeightModel.Size, TerrainHeightModel.Height, TerrainHeightModel.Size);

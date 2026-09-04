@@ -40,6 +40,7 @@ namespace WanderingCity.Editor
                 AssetDatabase.CreateAsset(new Material(Shader.Find("Universal Render Pipeline/Lit")), "Assets/_Game/Resources/WorldMaterial.mat");
 
             EnsureTravelerController();
+            AtmosphereAuthoring.Ensure();
 
             // Ensure authored art, terrain, layers, textures and environment prefab exist
             EnvironmentAuthoring.EnsureAllEnvironmentAssets();

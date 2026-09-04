@@ -145,7 +145,7 @@ namespace WanderingCity
             {
                 Label(menu, "循风而行\n在旷野中，建一个家。", 150, 230, 1300, 190, 66, ivory);
                 Label(menu, "一段关于探索、战斗与归途的单人冒险。\n从旅人据点出发，穿越树林与矿区，寻找沉眠遗迹中的星核。", 158, 470, 1150, 100, 27, ivory);
-                Button(menu, "继续旅程", 160, 635, 360, () => session.Begin(false)); Button(menu, "开始新旅程", 555, 635, 360, () => { Page = "new"; });
+                Button(menu, "声音设置", 950, 635, 360, () => Page = "settings"); Button(menu, "继续旅程", 160, 635, 360, () => session.Begin(false)); Button(menu, "开始新旅程", 555, 635, 360, () => { Page = "new"; });
                 Label(menu, "WASD 移动 · 鼠标转动镜头 · E 交互 · Esc 暂停\n风格化原型 / Windows PC / 本地单人存档", 160, 750, 1200, 90, 23, ivory);
                 menuInfo = Label(menu, "", 160, 905, 1580, 110, 19, gold); return;
             }
@@ -155,9 +155,10 @@ namespace WanderingCity
                 Label(menu, "已有存档会保留为带日期的归档文件；新旅程从据点开始。", 158, 390, 1500, 80, 27, ivory);
                 Button(menu, "出发", 160, 550, 350, () => session.Begin(true)); Button(menu, "返回", 550, 550, 350, () => Page = session.Started ? "pause" : "title"); return;
             }
-            Label(menu, Page == "craft" ? "工作台 / 为下一次远行做准备" : Page == "inventory" ? "行囊 / 旅途的收获" : Page == "map" ? "原野地图 / 选择你的道路" : "休息片刻", 150, 170, 1600, 82, 48, ivory);
-            Button(menu, "返回旅程", 1480, 85, 280, () => session.SetMenu(false));
-            if (Page == "craft")
+            Label(menu, Page == "settings" ? "声音设置" : Page == "craft" ? "工作台 / 为下一次远行做准备" : Page == "inventory" ? "行囊 / 旅途的收获" : Page == "map" ? "原野地图 / 选择你的道路" : "休息片刻", 150, 170, 1600, 82, 48, ivory);
+            Button(menu, session.Started ? "返回旅程" : "返回标题", 1480, 85, 280, () => { if (session.Started) session.SetMenu(false); else Page = "title"; });
+            if (Page == "settings") RenderAudioSettings();
+            else if (Page == "craft")
             {
                 int row = 0; foreach (var recipe in Rules.Recipes.Values) { string id = recipe.output; Label(menu, ItemName(id) + "\n" + string.Join(" + ", recipe.cost.Select(p => ItemName(p.Key) + " ×" + p.Value)), 175, 300 + row * 110, 990, 87, 25, ivory); Button(menu, "制作", 1290, 302 + row * 110, 320, () => session.Craft(id)); row++; }
                 Label(menu, "旅人长剑 Lv.2 / 伤害 26 → 42\n遗迹星核 ×1 + 星辉矿石 ×5", 175, 755, 1000, 92, 25, gold); Button(menu, "升级武器", 1290, 755, 320, session.Upgrade);
@@ -174,9 +175,25 @@ namespace WanderingCity
                 Label(menu, Rules.Objective(session.State), 165, 295, 1200, 130, 31, gold);
                 Button(menu, "保存旅程", 160, 470, 390, () => session.Save(true)); Button(menu, "查看地图", 590, 470, 390, () => Page = "map"); Button(menu, "查看背包", 1020, 470, 390, () => Page = "inventory");
                 Label(menu, "WASD 移动 / Shift 奔跑 / Space 跳跃 / 鼠标转动镜头\n左键 攻击 / 右键或 Ctrl 闪避 / E 交互 / Q 使用快捷物品\nB 建造 / R 旋转 / X 拆除 / F5 保存 / Tab 背包 / M 地图\n\n敌人橙色预警后会攻击，闪避开始时有短暂无敌。死亡保留背包。\n地板须在据点西侧网格内放置；屋顶需要同格地板及至少两面墙。", 165, 595, 1580, 235, 25, ivory);
-                Button(menu, "新旅程", 160, 855, 290, () => Page = "new"); Button(menu, "保存并退出", 500, 855, 350, () => { if (session.Save(true)) Application.Quit(); });
+                Button(menu, "声音设置", 920, 855, 350, () => Page = "settings"); Button(menu, "新旅程", 160, 855, 290, () => Page = "new"); Button(menu, "保存并退出", 500, 855, 350, () => { if (session.Save(true)) Application.Quit(); });
             }
             menuInfo = Label(menu, "", 160, 950, 1600, 120, 20, gold);
+        }
+        void RenderAudioSettings()
+        {
+            var audio = session.Audio; var settings = audio.Preferences;
+            string[] names = { "总音量", "音乐", "环境声", "音效与界面" };
+            Func<float>[] read = { () => settings.Master, () => settings.Music, () => settings.Ambience, () => settings.SFX };
+            Action<float>[] write = { v => settings.Master = v, v => settings.Music = v, v => settings.Ambience = v, v => settings.SFX = v };
+            for (int i = 0; i < names.Length; i++)
+            {
+                int index = i; float y = 310 + i * 115;
+                Label(menu, names[i], 190, y + 10, 550, 60, 30, ivory);
+                var value = Label(menu, Mathf.RoundToInt(read[i]() * 100) + "%", 800, y + 10, 180, 60, 30, gold);
+                void Change(float delta) { write[index](Mathf.Clamp01(read[index]() + delta)); value.text = Mathf.RoundToInt(read[index]() * 100) + "%"; if (!audio.SavePreferences()) session.Notify("音量已应用，但设置保存失败"); }
+                Button(menu, "− 10%", 1050, y, 180, () => Change(-.1f)); Button(menu, "+ 10%", 1270, y, 180, () => Change(.1f));
+            }
+            Label(menu, "音量会自动保存，开始新旅程时仍会保留。", 190, 820, 1350, 60, 24, ivory);
         }
         void RenderMap()
         {
@@ -233,7 +250,7 @@ namespace WanderingCity
         RectTransform Rect(GameObject go, Transform parent, float x, float y, float w, float h) { var rect = go.GetComponent<RectTransform>(); rect.SetParent(parent, false); rect.anchorMin = rect.anchorMax = new Vector2(0, 1); rect.pivot = new Vector2(0, 1); rect.anchoredPosition = new Vector2(x, -y); rect.sizeDelta = new Vector2(w, h); return rect; }
         Image Box(Transform parent, string name, float x, float y, float w, float h, Color color) { var go = new GameObject(name, typeof(RectTransform), typeof(Image)); Rect(go, parent, x, y, w, h); var image = go.GetComponent<Image>(); image.color = color; return image; }
         TMP_Text Label(Transform parent, string text, float x, float y, float w, float h, float size, Color color, TextAlignmentOptions alignment = TextAlignmentOptions.TopLeft) { var go = new GameObject("Text", typeof(RectTransform), typeof(TextMeshProUGUI)); Rect(go, parent, x, y, w, h); var tmp = go.GetComponent<TextMeshProUGUI>(); tmp.font = font; tmp.fontSize = size; tmp.color = color; tmp.text = text; tmp.alignment = alignment; tmp.raycastTarget = false; tmp.textWrappingMode = TextWrappingModes.Normal; return tmp; }
-        void Button(Transform parent, string text, float x, float y, float width, Action action) { var image = Box(parent, text, x, y, width, 65, new Color(.24f, .34f, .32f)); var button = image.gameObject.AddComponent<Button>(); var colors = button.colors; colors.highlightedColor = new Color(1, .88f, .6f); button.colors = colors; button.onClick.AddListener(() => action()); Label(image.rectTransform, text, 8, 15, width - 16, 42, 25, ivory, TextAlignmentOptions.Center); }
+        void Button(Transform parent, string text, float x, float y, float width, Action action) { var image = Box(parent, text, x, y, width, 65, new Color(.24f, .34f, .32f)); var button = image.gameObject.AddComponent<Button>(); var colors = button.colors; colors.highlightedColor = new Color(1, .88f, .6f); button.colors = colors; button.onClick.AddListener(() => { session.Audio?.Play(WorldSound.UI); action(); }); Label(image.rectTransform, text, 8, 15, width - 16, 42, 25, ivory, TextAlignmentOptions.Center); }
         void OnDestroy() { if (canvas != null) Destroy(canvas.gameObject); if (font != null) Destroy(font); }
     }
 }

@@ -26,8 +26,8 @@ namespace WanderingCity
         public float NoticeUntil;
         public WorldInteractable Target;
         float autoSaveAt;
-        AudioSource audioSource;
-        AudioClip note;
+        public AudioDirector Audio { get; private set; }
+        public WeatherDirector Weather { get; private set; }
         public bool AtWorkbench => Player != null && Vector3.Distance(Player.transform.position, WorldBuilder.WorkbenchPosition) < 4;
         public bool InputReady => Started && !Paused && (Application.isFocused || SavePathOverride != null);
 
@@ -37,13 +37,12 @@ namespace WanderingCity
             Balance = Resources.Load<GameBalance>("Balance") ?? ScriptableObject.CreateInstance<GameBalance>();
             Saves = new SaveStore(SavePathOverride ?? Path.Combine(Application.persistentDataPath, "journey.json"));
             Saves.Load(out var saved, out var message); State = saved ?? new GameState(); Notice = message;
-            audioSource = gameObject.AddComponent<AudioSource>();
-            note = AudioClip.Create("Original synthesized chime", 4410, 1, 44100, false);
-            var samples = new float[4410]; for (int i = 0; i < samples.Length; i++) samples[i] = Mathf.Sin(i * .065f) * .15f * (1f - i / 4410f); note.SetData(samples, 0);
             World = gameObject.AddComponent<WorldBuilder>(); World.Create(this);
             Exploration = GetComponent<ExplorationWorld>();
             Player = World.CreatePlayer(this); World.Restore(State);
             Hud = gameObject.AddComponent<GameHud>(); Hud.Create(this);
+            Audio = gameObject.AddComponent<AudioDirector>(); Audio.Initialize(this);
+            Weather = gameObject.AddComponent<WeatherDirector>(); Weather.Initialize(this);
             SetMenu(true, "title");
         }
         public void Begin(bool fresh)
@@ -75,7 +74,7 @@ namespace WanderingCity
         }
         public void Result(bool ok, string success, string fail)
         {
-            Notify(ok ? success : fail); if (ok) { Tone(1.3f); Save(); World.RefreshRewards(); }
+            Notify(ok ? success : fail); if (ok) { Audio?.Play(WorldSound.Pickup); Save(); World.RefreshRewards(); }
         }
         public void Craft(string kind) => Result(Rules.Craft(State, kind, AtWorkbench), "制作完成 / " + GameHud.ItemName(kind), "材料不足、背包已满或不在工作台附近");
         public void Upgrade() => Result(Rules.Upgrade(State, AtWorkbench), "长剑已升级 · 攻击力 26 → 42", "需要星核 ×1、矿石 ×5；仅可在工作台升级一次");
@@ -88,7 +87,7 @@ namespace WanderingCity
             bool ok = Saves.Save(State, out var message); if (announce || !ok) Notify(message); return ok;
         }
         public void Notify(string text) { Notice = text; NoticeUntil = Time.unscaledTime + 5; }
-        public void Tone(float pitch = 1) { audioSource.pitch = pitch; audioSource.PlayOneShot(note); }
+        public void Tone(float pitch = 1) => Audio?.Play(WorldSound.Interaction, pitch);
         public void Respawn()
         {
             State.hp = 100; State.x = 0; State.y = 1; State.z = 0; State.yaw = 0;
@@ -96,6 +95,6 @@ namespace WanderingCity
         }
         void OnApplicationFocus(bool focus) { if (!focus && Started && !Paused && SavePathOverride == null) SetMenu(true); }
         void OnApplicationQuit() { if (Started) Save(); Time.timeScale = 1; }
-        void OnDestroy() { if (note != null) Destroy(note); if (Current == this) Current = null; Time.timeScale = 1; }
+        void OnDestroy() { if (Current == this) Current = null; Time.timeScale = 1; }
     }
 }

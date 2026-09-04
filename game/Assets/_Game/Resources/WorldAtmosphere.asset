@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 801875abedb41c64a9c0101d31d6c9bd, type: 3}
+  m_Name: WorldAtmosphere
+  m_EditorClassIdentifier: WanderingCity::WanderingCity.WorldAtmosphere
+  TransitionSeconds: 18
+  AutomaticWeather: 1
+  ClearSeconds: 180
+  CloudySeconds: 100
+  RainSeconds: 75
+  WaterMaterial: {fileID: 2100000, guid: a51dbfaa75dae644d9235271570f70a5, type: 2}
+  RainMaterial: {fileID: 2100000, guid: 003bf7a1ea0571d4c89da2a586648977, type: 2}
